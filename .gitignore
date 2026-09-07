@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+backend/.venv/
+venv/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+npm-debug.log*
+
+# Env / OS
+.env
+.DS_Store
+Thumbs.db
+
+# Downloads (runtime artifacts)
+/tmp/
+*.mp3
+*.zip
