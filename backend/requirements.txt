@@ -3,3 +3,4 @@ uvicorn[standard]
 sse-starlette
 yt-dlp
 pydantic
+pywebview

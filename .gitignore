@@ -9,6 +9,9 @@ frontend/node_modules/
 frontend/dist/
 npm-debug.log*
 
+# Built frontend served by the desktop backend
+backend/static/
+
 # Env / OS
 .env
 .DS_Store

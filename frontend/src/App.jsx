@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 const WINDOW_TITLE = "YTQuickie v1.0 [Audio Ripper]";
 const MENU_ITEMS = ["File", "Options", "Tools", "Help"];
@@ -319,6 +319,30 @@ export default function App() {
     : step === "processing" ? `JOB ${jobStatus || "-"}`
     : "ARCHIVE READY";
 
+  // 6. Download archive (native save dialog in desktop, browser download as fallback)
+  const handleDownloadArchive = async () => {
+    try {
+      if (window.pywebview?.api) {
+        const raw = await window.pywebview.api.download_zip(jobId);
+        const res = typeof raw === "string" ? JSON.parse(raw) : raw;
+        if (res?.ok) {
+          setError(null);
+        } else if (!res?.cancelled) {
+          setError(res?.error || "Download failed");
+        }
+      } else {
+        const a = document.createElement("a");
+        a.href = `${API_BASE}/api/jobs/${jobId}/download`;
+        a.download = "";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+    } catch (err) {
+      setError(err.message || "Download failed");
+    }
+  };
+
   return (
     <div className="crt min-h-screen text-zinc-200 flex flex-col items-center p-3 sm:p-6 font-mono relative">
       <div className="scanlines" />
@@ -532,13 +556,12 @@ export default function App() {
                 </div>
               )}
 
-              <a
-                href={`${API_BASE}/api/jobs/${jobId}/download`}
-                download
+              <button
+                onClick={handleDownloadArchive}
                 className="bevel-up chisel-bg px-8 py-4 font-mono font-bold text-[15px] text-led-green uppercase tracking-widest text-center"
               >
                 ↓ DOWNLOAD ARCHIVE (.ZIP)
-              </a>
+              </button>
             </div>
           )}
         </div>

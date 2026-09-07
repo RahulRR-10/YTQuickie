@@ -5,11 +5,13 @@ import re
 import shutil
 import time
 import uuid
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 import yt_dlp
@@ -24,7 +26,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-BASE_DOWNLOAD_DIR = "/tmp/playlist_downloads"
+BASE_DOWNLOAD_DIR = os.path.join(
+    os.environ.get("YTQ_DOWNLOAD_DIR") or str(Path.home() / ".ytquickie" / "downloads")
+)
 os.makedirs(BASE_DOWNLOAD_DIR, exist_ok=True)
 
 CONCURRENCY_LIMIT = 4
@@ -329,6 +333,8 @@ async def stream_job_progress(job_id: str):
 
     async def event_generator():
         yield {"event": "state", "data": json.dumps(jobs[job_id])}
+        if jobs[job_id]["status"] in ("completed", "failed", "cancelled"):
+            return
         try:
             while True:
                 data = await queue.get()
@@ -377,3 +383,10 @@ async def cancel_job(job_id: str):
     job["status"] = "cancelling"
     await publish_event(job_id, {"type": "job_status", "status": "cancelling"})
     return {"status": "cancelling"}
+
+
+# --- Static frontend (built React app) ---
+# Mounted last so /api/* routes above are matched first.
+STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+if os.path.isdir(STATIC_DIR):
+    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
