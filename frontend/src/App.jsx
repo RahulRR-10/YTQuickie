@@ -75,9 +75,12 @@ function SegBar({ pct = 0, status = "pending" }) {
   );
 }
 
-function TitleBar({ onReset, showReset }) {
+function TitleBar({ onMinimize, onClose, showReset, isDesktop }) {
   return (
-    <div className="flex items-center justify-between h-10 pl-2 pr-1 select-none bg-gradient-to-b from-[#0b2f54] to-[#071b33] border-b-2 border-black">
+    <div
+      className="pywebview-drag-region flex items-center justify-between h-10 pl-2 pr-1 select-none bg-gradient-to-b from-[#0b2f54] to-[#071b33] border-b-2 border-black"
+      style={{ userSelect: "none", WebkitUserSelect: "none" }}
+    >
       <div className="flex items-center gap-2 min-w-0">
         <span className="bevel-in w-6 h-6 flex items-center justify-center bg-black text-led-green text-[13px] leading-none">
           ♫
@@ -87,17 +90,18 @@ function TitleBar({ onReset, showReset }) {
         </span>
       </div>
       <div className="flex items-center gap-1">
-        <button className="w-5 h-5 bevel-up chisel-bg text-[10px] font-bold text-zinc-300 leading-none active:translate-y-[1px]">
+        <button
+          onClick={onMinimize}
+          className="w-5 h-5 bevel-up chisel-bg text-[10px] font-bold text-zinc-300 leading-none active:translate-y-[1px]"
+          title="Minimize"
+        >
           _
         </button>
-        <button className="w-5 h-5 bevel-up chisel-bg text-[10px] font-bold text-zinc-300 leading-none active:translate-y-[1px]">
-          □
-        </button>
         <button
-          onClick={onReset}
-          disabled={!showReset}
+          onClick={onClose}
+          disabled={!showReset && !isDesktop}
           className="w-5 h-5 bevel-up chisel-bg text-[10px] font-bold text-led-red leading-none active:translate-y-[1px] disabled:opacity-30"
-          title="Close / Reset"
+          title="Close"
         >
           X
         </button>
@@ -306,6 +310,19 @@ export default function App() {
     setError(null);
   };
 
+  // 6. Window controls (desktop only; browser falls back to reset)
+  const isDesktop = !!window.pywebview?.api;
+  const handleMinimize = () => {
+    window.pywebview?.api?.minimize?.();
+  };
+  const handleClose = () => {
+    if (window.pywebview?.api?.close) {
+      window.pywebview.api.close();
+    } else {
+      handleReset();
+    }
+  };
+
   const failedCount = Object.values(tracksStatus).filter((t) => t.status === "failed").length;
   const doneCount = Object.values(tracksStatus).filter((t) => t.status === "done").length;
   const failedTracks = Array.from(selectedIds)
@@ -319,7 +336,7 @@ export default function App() {
     : step === "processing" ? `JOB ${jobStatus || "-"}`
     : "ARCHIVE READY";
 
-  // 6. Download archive (native save dialog in desktop, browser download as fallback)
+  // 7. Download archive (native save dialog in desktop, browser download as fallback)
   const handleDownloadArchive = async () => {
     try {
       if (window.pywebview?.api) {
@@ -344,14 +361,19 @@ export default function App() {
   };
 
   return (
-    <div className="crt min-h-screen text-zinc-200 flex flex-col items-center p-3 sm:p-6 font-mono relative">
+    <div className="crt h-screen w-screen text-zinc-200 flex flex-col font-mono relative overflow-hidden">
       <div className="scanlines" />
 
-      <div className="w-full max-w-4xl bevel-up chisel-bg flex flex-col">
-        <TitleBar onReset={handleReset} showReset={step !== "input"} />
+      <div className="flex-1 min-h-0 w-full bevel-up chisel-bg flex flex-col">
+        <TitleBar
+          onMinimize={handleMinimize}
+          onClose={handleClose}
+          showReset={step !== "input"}
+          isDesktop={isDesktop}
+        />
         <MenuStrip />
 
-        <div className="flex flex-col gap-4 p-3">
+        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 p-3 sm:p-4">
           {/* Error Alert */}
           {error && (
             <div className="bevel-in bg-black p-3 flex items-start gap-2 text-led-red">

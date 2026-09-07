@@ -22,12 +22,18 @@ from main import app, jobs
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8756
 WINDOW_TITLE = "YTQuickie v1.0 [Audio Ripper]"
-WINDOW_WIDTH = 1100
-WINDOW_HEIGHT = 780
+WINDOW_WIDTH = 820
+WINDOW_HEIGHT = 620
 
 
 class JsApi:
     """Exposed to the frontend as window.pywebview.api.*."""
+
+    def minimize(self):
+        webview.windows[0].minimize()
+
+    def close(self):
+        webview.windows[0].destroy()
 
     def download_zip(self, job_id: str) -> str:
         """Save the finished archive via a native dialog. Returns a JSON string."""
@@ -97,7 +103,12 @@ def main() -> None:
         url,
         width=WINDOW_WIDTH,
         height=WINDOW_HEIGHT,
-        min_size=(800, 600),
+        min_size=(WINDOW_WIDTH, WINDOW_HEIGHT),
+        resizable=True,
+        frameless=True,
+        easy_drag=False,
+        shadow=True,
+        background_color="#050507",
         js_api=JsApi(),
     )
 
