@@ -1,15 +1,104 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Segoe UI", Tahoma, Geneva, sans-serif;
+  --font-mono: "Courier New", Courier, monospace;
+  --font-bitmap: "Courier New", Courier, monospace;
+
+  --color-led-green: #00ff66;
+  --color-led-amber: #ffb000;
+  --color-led-cyan: #00e5ff;
+  --color-led-red: #ff3355;
 }
 
 body {
   margin: 0;
-  background: #020617;
-  color: #f1f5f9;
+  background-color: #070709;
+  color: #d4d4d8;
+  font-family: var(--font-mono);
+  -webkit-font-smoothing: none;
 }
 
-#root {
-  min-height: 100vh;
+* {
+  border-radius: 0 !important;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0a0d;
+}
+::-webkit-scrollbar-thumb {
+  background: #2d2d34;
+  border: 1px solid #000;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a44;
+}
+
+@layer components {
+  .bevel-up {
+    border-style: solid;
+    border-width: 2px;
+    border-color: #000;
+    border-top-color: #5a5a64;
+    border-left-color: #4a4a54;
+    border-bottom-color: #000;
+    border-right-color: #0a0a0c;
+  }
+
+  .bevel-in {
+    border-style: solid;
+    border-width: 2px;
+    border-color: #000;
+    border-top-color: #000;
+    border-left-color: #0a0a0c;
+    border-bottom-color: #3a3a44;
+    border-right-color: #2d2d34;
+  }
+
+  .chisel-bg {
+    background: linear-gradient(180deg, #2d2d34 0%, #1e1e24 45%, #141418 100%);
+  }
+
+  .crt {
+    background:
+      radial-gradient(120% 120% at 50% 0%, #101015 0%, #0a0a0e 45%, #050507 100%);
+  }
+
+  .scanlines {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0) 0px,
+      rgba(0, 0, 0, 0) 2px,
+      rgba(0, 0, 0, 0.28) 3px
+    );
+    opacity: 0.35;
+  }
+
+  .led {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+  }
+}
+
+@keyframes ledPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.animate-led {
+  animation: ledPulse 1s steps(2, start) infinite;
 }

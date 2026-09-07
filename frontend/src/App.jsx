@@ -1,16 +1,124 @@
 import React, { useState, useEffect, useRef } from "react";
-import { 
-  Download, 
-  RotateCcw, 
-  Music, 
-  CheckCircle2, 
-  AlertCircle, 
-  Loader2, 
-  XCircle,
-  FileArchive
-} from "lucide-react";
 
 const API_BASE = "http://localhost:8000";
+
+const WINDOW_TITLE = "YTQuickie v1.0 [Audio Ripper]";
+const MENU_ITEMS = ["File", "Options", "Tools", "Help"];
+
+// --- Retro UI building blocks -------------------------------------------------
+
+function Led({ label, active, color = "#00ff66", blink }) {
+  const lit = active && !blink;
+  return (
+    <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-zinc-400 select-none">
+      <span
+        className={`led ${lit ? "animate-led" : ""}`}
+        style={{
+          background: active ? color : "#3f3f46",
+          boxShadow: active ? `0 0 6px ${color}` : "none",
+        }}
+      />
+      {label}
+    </span>
+  );
+}
+
+function RetroButton({ children, onClick, disabled, className = "", tone = "default", type = "button" }) {
+  const toneCls =
+    tone === "primary" ? "text-led-green"
+    : tone === "danger" ? "text-led-red"
+    : tone === "amber" ? "text-led-amber"
+    : "text-zinc-200";
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className={`bevel-up chisel-bg font-mono text-[11px] font-bold uppercase tracking-wider select-none px-3 py-1.5 active:translate-y-[1px] active:border-t-black active:border-l-black active:border-b-zinc-500 active:border-r-zinc-500 disabled:opacity-40 disabled:cursor-not-allowed ${toneCls} ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function StatusTag({ status }) {
+  const map = {
+    pending: ["QUEUED", "text-zinc-400"],
+    downloading: ["RIP", "text-led-cyan"],
+    converting: ["ENC", "text-led-amber"],
+    done: ["OK", "text-led-green"],
+    failed: ["ERR", "text-led-red"],
+    cancelled: ["ABRT", "text-led-red"],
+  };
+  const [label, color] = map[status] || [String(status || "?").toUpperCase(), "text-zinc-300"];
+  return <span className={`text-[10px] font-bold ${color}`}>[{label}]</span>;
+}
+
+function SegBar({ pct = 0, status = "pending" }) {
+  const SEGMENTS = 20;
+  const filled = Math.max(0, Math.min(SEGMENTS, Math.round(((pct || 0) / 100) * SEGMENTS)));
+  const tone =
+    status === "done" ? "bg-led-green"
+    : status === "failed" || status === "cancelled" ? "bg-led-red"
+    : status === "converting" ? "bg-led-amber animate-led"
+    : status === "downloading" ? "bg-led-green"
+    : "bg-zinc-700";
+  return (
+    <div className="bevel-up bg-black p-1 flex gap-[3px]">
+      {Array.from({ length: SEGMENTS }).map((_, i) => (
+        <span
+          key={i}
+          className={`h-3 flex-1 ${i < filled ? tone : "bg-zinc-900"}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+function TitleBar({ onReset, showReset }) {
+  return (
+    <div className="flex items-center justify-between h-8 pl-2 pr-1 select-none bg-gradient-to-b from-[#0b2f54] to-[#071b33] border-b-2 border-black">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="bevel-in w-5 h-5 flex items-center justify-center bg-black text-led-green text-[11px] leading-none">
+          ♫
+        </span>
+        <span className="font-bitmap text-[12px] font-bold tracking-wide text-white truncate">
+          {WINDOW_TITLE}
+        </span>
+      </div>
+      <div className="flex items-center gap-1">
+        <button className="w-5 h-5 bevel-up chisel-bg text-[10px] font-bold text-zinc-300 leading-none active:translate-y-[1px]">
+          _
+        </button>
+        <button className="w-5 h-5 bevel-up chisel-bg text-[10px] font-bold text-zinc-300 leading-none active:translate-y-[1px]">
+          □
+        </button>
+        <button
+          onClick={onReset}
+          disabled={!showReset}
+          className="w-5 h-5 bevel-up chisel-bg text-[10px] font-bold text-led-red leading-none active:translate-y-[1px] disabled:opacity-30"
+          title="Close / Reset"
+        >
+          X
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MenuStrip() {
+  return (
+    <div className="flex gap-5 px-3 py-1 border-b-2 border-black bg-[#101014] font-mono text-[11px] text-zinc-300 select-none">
+      {MENU_ITEMS.map((m) => (
+        <span key={m} className="px-1 hover:bg-led-green hover:text-black cursor-default">
+          {m}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// --- Main App -----------------------------------------------------------------
 
 export default function App() {
   // Navigation & Step State
@@ -205,238 +313,251 @@ export default function App() {
     .filter((t) => tracksStatus[t.vid]?.status === "failed")
     .map((t) => ({ vid: t.vid, title: t.title, error: tracksStatus[t.vid].error }));
 
+  const statusLine =
+    step === "input" ? "AWAITING PLAYLIST URL"
+    : step === "preview" ? `SELECTED ${selectedIds.size}/${playlist ? playlist.returned_tracks : 0}`
+    : step === "processing" ? `JOB ${jobStatus || "-"}`
+    : "ARCHIVE READY";
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center p-4 sm:p-8 font-sans">
-      <header className="w-full max-w-4xl flex items-center justify-between pb-6 mb-8 border-b border-slate-800">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-600 rounded-lg text-white">
-            <Music className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">Playlist to MP3</h1>
-            <p className="text-xs text-slate-400">Fast batch audio extraction</p>
-          </div>
-        </div>
-        {step !== "input" && (
-          <button
-            onClick={handleReset}
-            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-md transition"
-          >
-            <RotateCcw className="w-3.5 h-3.5" /> Start Over
-          </button>
-        )}
-      </header>
+    <div className="crt min-h-screen text-zinc-200 flex flex-col items-center p-3 sm:p-6 font-mono relative">
+      <div className="scanlines" />
 
-      <main className="w-full max-w-4xl">
-        {/* Error Alert */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-950/60 border border-red-800/80 rounded-xl flex items-center gap-3 text-red-200">
-            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-            <p className="text-sm">{error}</p>
-          </div>
-        )}
+      <div className="w-full max-w-2xl bevel-up chisel-bg flex flex-col">
+        <TitleBar onReset={handleReset} showReset={step !== "input"} />
+        <MenuStrip />
 
-        {/* STEP 1: Input URL */}
-        {step === "input" && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-10 text-center shadow-xl">
-            <h2 className="text-2xl font-semibold mb-2">Fetch YouTube Playlist</h2>
-            <p className="text-slate-400 text-sm mb-6">
-              Paste a public playlist URL to select and extract MP3 tracks.
-            </p>
-            <form onSubmit={handleFetchPlaylist} className="flex flex-col sm:flex-row gap-3 max-w-xl mx-auto">
-              <input
-                type="text"
-                placeholder="https://www.youtube.com/playlist?list=..."
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                className="flex-1 px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                required
-              />
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 font-medium rounded-xl text-sm transition flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Fetch"}
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* STEP 2: Preview & Select Tracks */}
-        {step === "preview" && playlist && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col gap-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-800">
-              <div>
-                <h2 className="text-xl font-bold">{playlist.playlist_title}</h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Showing {playlist.returned_tracks} of {playlist.total_tracks_in_playlist} items
-                  {playlist.truncated && " (Capped at 50 max for MVP)"}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={toggleSelectAll}
-                  className="text-xs font-medium px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition"
-                >
-                  {selectedIds.size === playlist.tracks.length ? "Deselect All" : "Select All"}
-                </button>
-                <button
-                  onClick={handleStartDownload}
-                  disabled={selectedIds.size === 0 || loading}
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 font-medium rounded-lg text-sm transition flex items-center gap-2 disabled:opacity-50"
-                >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : `Download (${selectedIds.size})`}
-                </button>
-              </div>
+        <div className="flex flex-col gap-3 p-2">
+          {/* Error Alert */}
+          {error && (
+            <div className="bevel-in bg-black p-3 flex items-start gap-2 text-led-red">
+              <span className="text-[11px] font-bold">&gt;&gt; ERROR:</span>
+              <p className="text-[11px] leading-relaxed break-words">{error}</p>
             </div>
+          )}
 
-            {/* Track Selection Table */}
-            <div className="divide-y divide-slate-800/60 max-h-[550px] overflow-y-auto pr-2">
-              {playlist.tracks.map((t) => {
-                const isSelected = selectedIds.has(t.id);
-                return (
-                  <div
-                    key={t.id}
-                    onClick={() => toggleSelect(t.id)}
-                    className={`flex items-center gap-4 py-3 px-2 rounded-lg cursor-pointer transition select-none ${
-                      isSelected ? "hover:bg-slate-800/40" : "opacity-40 hover:opacity-75"
-                    }`}
-                  >
+          {/* STEP 1: Input URL */}
+          {step === "input" && (
+            <div className="flex flex-col gap-3">
+              <div className="bevel-in bg-black px-3 py-2 flex items-center justify-between gap-2">
+                <span className="text-[12px] font-bold text-led-green uppercase tracking-wider">
+                  &gt;&gt; Tape-deck / URL Receiver
+                </span>
+                <span className="text-[9px] text-zinc-500">SRC: YOUTUBE</span>
+              </div>
+
+              <div className="bevel-in bg-black px-2 py-1">
+                <div className="text-[9px] text-zinc-500 uppercase">&gt; Paste playlist url below</div>
+                <form onSubmit={handleFetchPlaylist} className="flex flex-col gap-3 pt-2">
+                  <div className="bevel-up bg-black px-2 py-1 flex items-center gap-2">
+                    <span className="text-[10px] text-led-cyan">URL&gt;</span>
                     <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => {}}
-                      className="rounded border-slate-700 text-indigo-600 focus:ring-0 w-4 h-4 pointer-events-none"
+                      type="text"
+                      placeholder="https://www.youtube.com/playlist?list=..."
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      className="flex-1 bg-transparent font-mono text-[12px] text-led-green placeholder-zinc-600 focus:outline-none caret-led-green"
+                      required
                     />
-                    <img
-                      src={t.thumbnail || "https://placehold.co/80x45/020617/white?text=Audio"}
-                      alt=""
-                      className="w-16 h-10 object-cover rounded bg-slate-950 flex-shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{t.title}</p>
-                      <p className="text-xs text-slate-500">{formatDuration(t.duration)}</p>
-                    </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
-        {/* STEP 3: Active Processing & SSE Streaming */}
-        {step === "processing" && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col gap-6">
-            <div className="flex justify-between items-center pb-4 border-b border-slate-800">
-              <div>
-                <h2 className="text-lg font-bold">Processing Audio Tracks</h2>
-                <p className="text-xs text-slate-400 capitalize">Job Status: {jobStatus}</p>
-              </div>
-              {jobStatus !== "cancelled" && (
-                <button
-                  onClick={handleCancelJob}
-                  className="text-xs text-red-400 hover:text-red-300 border border-red-900 bg-red-950/40 px-3 py-1.5 rounded-md transition flex items-center gap-1.5"
-                >
-                  <XCircle className="w-3.5 h-3.5" /> Cancel Job
-                </button>
-              )}
-            </div>
-
-            {/* Per-Track Progress Rows */}
-            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-              {Array.from(selectedIds).map((vid) => {
-                const track = tracksStatus[vid] || { status: "pending", progress: 0 };
-                const originalMeta = playlist?.tracks.find((t) => t.id === vid);
-
-                return (
-                  <div key={vid} className="p-3 bg-slate-950 rounded-xl border border-slate-800/80">
-                    <div className="flex justify-between items-center text-xs mb-1.5">
-                      <span className="font-medium text-slate-300 truncate max-w-md">
-                        {originalMeta?.title || vid}
-                      </span>
-                      <span className="capitalize text-slate-400 text-[11px] font-mono">
-                        {track.status} {track.status === "downloading" && `(${track.progress}%)`}
-                      </span>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-4">
+                      <Led label="READY" active={!loading && !error} />
+                      <Led label="BUSY" active={loading} color="#ffb000" blink={loading} />
+                      <Led label="ERR" active={!!error} color="#ff3355" blink={!!error} />
                     </div>
+                    <RetroButton type="submit" tone="primary" disabled={loading}>
+                      {loading ? "COMMS... BUSY" : "FETCH TRACKS"}
+                    </RetroButton>
+                  </div>
+                </form>
+              </div>
 
-                    {/* Progress Bar Container */}
-                    <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+              <div className="bevel-in bg-black px-3 py-2 flex items-center gap-4">
+                <Led label="PWR" active color="#00ff66" />
+                <Led label="LINK" active color="#00e5ff" />
+                <span className="text-[9px] text-zinc-600 uppercase tracking-wider">
+                  Max 50 tracks per rip · 192kbps encode
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2: Preview & Select Tracks */}
+          {step === "preview" && playlist && (
+            <div className="flex flex-col gap-3">
+              <div className="bevel-in bg-black px-3 py-2 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[12px] font-bold text-led-green uppercase truncate">
+                    {playlist.playlist_title}
+                  </span>
+                  <span className="text-[10px] text-zinc-500 whitespace-nowrap">
+                    {playlist.returned_tracks}/{playlist.total_tracks_in_playlist} ITEMS
+                    {playlist.truncated ? " (CAP 50)" : ""}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] text-zinc-500 uppercase">&gt; Tracks ready for selection</span>
+                  <Led label={`${selectedIds.size} SEL`} active={selectedIds.size > 0} color="#00e5ff" />
+                </div>
+              </div>
+
+              <div className="bevel-in bg-black">
+                <div className="flex items-center gap-2 px-2 py-1.5 border-b-2 border-black bg-[#141418] font-mono text-[10px] font-bold tracking-wider text-led-amber select-none">
+                  <span className="w-7">[x]</span>
+                  <span className="flex-1">TRACK TITLE</span>
+                  <span className="w-14 text-right">LEN</span>
+                  <span className="w-20 text-right">BITRATE</span>
+                </div>
+                <div className="max-h-[380px] overflow-y-auto">
+                  {playlist.tracks.map((t, i) => {
+                    const isSelected = selectedIds.has(t.id);
+                    return (
                       <div
-                        className={`h-full transition-all duration-300 ${
-                          track.status === "done"
-                            ? "bg-emerald-500 w-full"
-                            : track.status === "failed" || track.status === "cancelled"
-                            ? "bg-red-500 w-full"
-                            : track.status === "converting"
-                            ? "bg-amber-500 w-full animate-pulse"
-                            : "bg-indigo-500"
+                        key={t.id}
+                        onClick={() => toggleSelect(t.id)}
+                        className={`flex items-center gap-2 px-2 py-1 font-mono text-[11px] cursor-pointer select-none border-b border-zinc-900 ${
+                          i % 2 ? "bg-zinc-900/70" : "bg-black"
+                        } ${
+                          isSelected ? "text-led-green" : "text-zinc-500 hover:text-zinc-200"
                         }`}
-                        style={{
-                          width:
-                            track.status === "downloading"
-                              ? `${track.progress}%`
-                              : undefined,
-                        }}
+                      >
+                        <span className="w-7">{isSelected ? "[+]" : "[ ]"}</span>
+                        <span className="flex-1 truncate">{t.title}</span>
+                        <span className="w-14 text-right text-zinc-400">
+                          {formatDuration(t.duration)}
+                        </span>
+                        <span className="w-20 text-right text-led-cyan">192k</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <RetroButton onClick={toggleSelectAll}>
+                  {selectedIds.size === playlist.tracks.length ? "CLEAR" : "SELECT ALL"}
+                </RetroButton>
+                <RetroButton tone="primary" onClick={handleStartDownload} disabled={selectedIds.size === 0 || loading}>
+                  {loading ? "RIPPING..." : `RIP MP3s (${selectedIds.size})`}
+                </RetroButton>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: Active Processing & SSE Streaming */}
+          {step === "processing" && (
+            <div className="flex flex-col gap-3">
+              <div className="bevel-in bg-black px-3 py-2 flex items-center justify-between gap-2">
+                <span className="text-[12px] font-bold text-led-green uppercase">
+                  &gt;&gt; Tape deck active — rip sequence running
+                </span>
+                <Led label="REC" active color="#ff3355" blink />
+              </div>
+
+              <div className="bevel-in bg-black p-2 flex flex-col gap-2 max-h-[460px] overflow-y-auto">
+                <div className="text-[10px] text-zinc-500">
+                  &gt; JOB STATUS: <span className="text-led-amber uppercase">{jobStatus}</span>
+                </div>
+                {Array.from(selectedIds).map((vid) => {
+                  const track = tracksStatus[vid] || { status: "pending", progress: 0 };
+                  const originalMeta = playlist?.tracks.find((t) => t.id === vid);
+
+                  return (
+                    <div key={vid} className="border border-zinc-900 p-2 flex flex-col gap-1.5 bg-zinc-950/50">
+                      <div className="flex items-center justify-between gap-2 font-mono text-[10px]">
+                        <span className="truncate text-zinc-200">{originalMeta?.title || vid}</span>
+                        <span className="flex items-center gap-2 whitespace-nowrap">
+                          <StatusTag status={track.status} />
+                          {track.status === "downloading" && (
+                            <span className="text-led-cyan">({track.progress}%)</span>
+                          )}
+                          {track.status === "converting" && (
+                            <span className="text-led-amber">44.1kHz</span>
+                          )}
+                        </span>
+                      </div>
+                      <SegBar
+                        pct={
+                          track.status === "downloading" ? track.progress
+                          : track.status === "done" ? 100
+                          : track.status === "converting" ? 100
+                          : 0
+                        }
+                        status={track.status}
                       />
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+                  );
+                })}
+              </div>
 
-        {/* STEP 4: Completed View */}
-        {step === "completed" && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center shadow-xl flex flex-col items-center gap-5">
-            <div className="w-12 h-12 bg-emerald-950 text-emerald-400 border border-emerald-800/50 rounded-full flex items-center justify-center">
-              <CheckCircle2 className="w-6 h-6" />
+              {jobStatus !== "cancelled" && (
+                <RetroButton tone="danger" onClick={handleCancelJob}>
+                  [ABORT OPERATION]
+                </RetroButton>
+              )}
             </div>
-            <div>
-              <h2 className="text-xl font-bold">Conversion Complete!</h2>
-              <p className="text-slate-400 text-sm mt-1">
-                {doneCount} of {selectedIds.size} tracks converted successfully.
-              </p>
-            </div>
+          )}
 
-            {/* Report: failed tracks */}
-            {failedTracks.length > 0 && (
-              <div className="w-full text-left bg-slate-950 border border-red-900/50 rounded-xl p-4 flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-red-300">
-                    {failedTracks.length} Failed ({failedCount} total errors)
-                  </h3>
-                  <div className="flex gap-3 text-xs">
-                    <span className="text-emerald-400">{doneCount} converted</span>
-                    <span className="text-red-400">{failedCount} failed</span>
+          {/* STEP 4: Completed View */}
+          {step === "completed" && (
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="bevel-in bg-black w-full px-3 py-4 flex flex-col items-center gap-1">
+                <span className="font-bitmap text-[18px] font-bold tracking-widest text-led-green">
+                  RIPPING COMPLETE
+                </span>
+                <span className="text-[10px] text-zinc-400 uppercase tracking-wider">
+                  All tracks cached — archive ready
+                </span>
+              </div>
+
+              <div className="bevel-in bg-black w-full px-3 py-2 font-mono text-[10px] text-zinc-300 flex flex-wrap justify-center gap-x-5 gap-y-1 uppercase">
+                <span>Tracks Encoded: <span className="text-led-green font-bold">{doneCount}</span></span>
+                <span>Skipped: <span className="text-led-red font-bold">{failedCount}</span></span>
+                <span>Format: <span className="text-led-cyan font-bold">MPEG-1 L3</span></span>
+              </div>
+
+              {failedTracks.length > 0 && (
+                <div className="w-full bevel-in bg-black p-2 flex flex-col gap-1.5 text-left max-h-44 overflow-y-auto">
+                  <div className="text-[10px] font-bold text-led-red">
+                    &gt; {failedTracks.length} TRACK(S) FAILED:
                   </div>
-                </div>
-                <div className="divide-y divide-red-900/30 max-h-40 overflow-y-auto">
-                  {failedTracks.map(({ vid, title, error }) => (
-                    <div key={vid} className="py-2 flex flex-col gap-0.5">
-                      <span className="text-xs font-medium text-red-200 truncate">
-                        {title || vid}
-                      </span>
-                      <span className="text-[11px] text-red-400/80 break-words">
-                        {error || "Unknown error"}
-                      </span>
+                  {failedTracks.map((t) => (
+                    <div key={t.vid} className="flex flex-col font-mono text-[10px] border-t border-zinc-900 pt-1.5">
+                      <span className="text-zinc-300 truncate">{t.title || t.vid}</span>
+                      <span className="text-led-red">&gt; {t.error || "UNKNOWN ERROR"}</span>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              )}
 
-            <a
-              href={`${API_BASE}/api/jobs/${jobId}/download`}
-              download
-              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl text-sm transition flex items-center gap-2 shadow-lg shadow-emerald-900/30"
-            >
-              <FileArchive className="w-4 h-4" /> Download Available MP3s (.ZIP)
-            </a>
-          </div>
-        )}
-      </main>
+              <a
+                href={`${API_BASE}/api/jobs/${jobId}/download`}
+                download
+                className="bevel-up chisel-bg px-6 py-3 font-mono font-bold text-[13px] text-led-green uppercase tracking-widest text-center"
+              >
+                ↓ DOWNLOAD ARCHIVE (.ZIP)
+              </a>
+            </div>
+          )}
+        </div>
+
+        {/* Status Bar */}
+        <div className="flex items-center justify-between gap-2 px-2 h-7 border-t-2 border-black bg-[#0d0d11] font-mono text-[9px] text-zinc-500 uppercase select-none">
+          <span className="flex items-center gap-2 min-w-0">
+            <span
+              className="led"
+              style={{
+                background: step === "failed" || error ? "#ff3355" : "#00ff66",
+                boxShadow: step === "failed" || error ? "0 0 6px #ff3355" : "0 0 6px #00ff66",
+              }}
+            />
+            <span className="truncate">&gt;&gt; {statusLine}</span>
+          </span>
+          <span className="hidden sm:inline whitespace-nowrap">YTQ v1.0 · 192KBPS</span>
+        </div>
+      </div>
     </div>
   );
 }
