@@ -10,7 +10,7 @@ const MENU_ITEMS = ["File", "Options", "Tools", "Help"];
 function Led({ label, active, color = "#00ff66", blink }) {
   const lit = active && !blink;
   return (
-    <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-zinc-400 select-none">
+    <span className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-zinc-400 select-none">
       <span
         className={`led ${lit ? "animate-led" : ""}`}
         style={{
@@ -34,7 +34,7 @@ function RetroButton({ children, onClick, disabled, className = "", tone = "defa
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`bevel-up chisel-bg font-mono text-[11px] font-bold uppercase tracking-wider select-none px-3 py-1.5 active:translate-y-[1px] active:border-t-black active:border-l-black active:border-b-zinc-500 active:border-r-zinc-500 disabled:opacity-40 disabled:cursor-not-allowed ${toneCls} ${className}`}
+      className={`bevel-up chisel-bg font-mono text-[12px] font-bold uppercase tracking-wider select-none px-3 py-1.5 active:translate-y-[1px] active:border-t-black active:border-l-black active:border-b-zinc-500 active:border-r-zinc-500 disabled:opacity-40 disabled:cursor-not-allowed ${toneCls} ${className}`}
     >
       {children}
     </button>
@@ -55,7 +55,7 @@ function StatusTag({ status }) {
 }
 
 function SegBar({ pct = 0, status = "pending" }) {
-  const SEGMENTS = 20;
+  const SEGMENTS = 24;
   const filled = Math.max(0, Math.min(SEGMENTS, Math.round(((pct || 0) / 100) * SEGMENTS)));
   const tone =
     status === "done" ? "bg-led-green"
@@ -64,11 +64,11 @@ function SegBar({ pct = 0, status = "pending" }) {
     : status === "downloading" ? "bg-led-green"
     : "bg-zinc-700";
   return (
-    <div className="bevel-up bg-black p-1 flex gap-[3px]">
+    <div className="bevel-up bg-black p-1.5 flex gap-[3px]">
       {Array.from({ length: SEGMENTS }).map((_, i) => (
         <span
           key={i}
-          className={`h-3 flex-1 ${i < filled ? tone : "bg-zinc-900"}`}
+          className={`h-4 flex-1 ${i < filled ? tone : "bg-zinc-900"}`}
         />
       ))}
     </div>
@@ -77,12 +77,12 @@ function SegBar({ pct = 0, status = "pending" }) {
 
 function TitleBar({ onReset, showReset }) {
   return (
-    <div className="flex items-center justify-between h-8 pl-2 pr-1 select-none bg-gradient-to-b from-[#0b2f54] to-[#071b33] border-b-2 border-black">
+    <div className="flex items-center justify-between h-10 pl-2 pr-1 select-none bg-gradient-to-b from-[#0b2f54] to-[#071b33] border-b-2 border-black">
       <div className="flex items-center gap-2 min-w-0">
-        <span className="bevel-in w-5 h-5 flex items-center justify-center bg-black text-led-green text-[11px] leading-none">
+        <span className="bevel-in w-6 h-6 flex items-center justify-center bg-black text-led-green text-[13px] leading-none">
           ♫
         </span>
-        <span className="font-bitmap text-[12px] font-bold tracking-wide text-white truncate">
+        <span className="font-bitmap text-[14px] font-bold tracking-wide text-white truncate">
           {WINDOW_TITLE}
         </span>
       </div>
@@ -108,7 +108,7 @@ function TitleBar({ onReset, showReset }) {
 
 function MenuStrip() {
   return (
-    <div className="flex gap-5 px-3 py-1 border-b-2 border-black bg-[#101014] font-mono text-[11px] text-zinc-300 select-none">
+    <div className="flex gap-5 px-3 py-1.5 border-b-2 border-black bg-[#101014] font-mono text-[12px] text-zinc-300 select-none">
       {MENU_ITEMS.map((m) => (
         <span key={m} className="px-1 hover:bg-led-green hover:text-black cursor-default">
           {m}
@@ -323,46 +323,46 @@ export default function App() {
     <div className="crt min-h-screen text-zinc-200 flex flex-col items-center p-3 sm:p-6 font-mono relative">
       <div className="scanlines" />
 
-      <div className="w-full max-w-2xl bevel-up chisel-bg flex flex-col">
+      <div className="w-full max-w-4xl bevel-up chisel-bg flex flex-col">
         <TitleBar onReset={handleReset} showReset={step !== "input"} />
         <MenuStrip />
 
-        <div className="flex flex-col gap-3 p-2">
+        <div className="flex flex-col gap-4 p-3">
           {/* Error Alert */}
           {error && (
             <div className="bevel-in bg-black p-3 flex items-start gap-2 text-led-red">
-              <span className="text-[11px] font-bold">&gt;&gt; ERROR:</span>
-              <p className="text-[11px] leading-relaxed break-words">{error}</p>
+              <span className="text-[12px] font-bold">&gt;&gt; ERROR:</span>
+              <p className="text-[12px] leading-relaxed break-words">{error}</p>
             </div>
           )}
 
           {/* STEP 1: Input URL */}
           {step === "input" && (
             <div className="flex flex-col gap-3">
-              <div className="bevel-in bg-black px-3 py-2 flex items-center justify-between gap-2">
-                <span className="text-[12px] font-bold text-led-green uppercase tracking-wider">
+              <div className="bevel-in bg-black px-4 py-3 flex items-center justify-between gap-2">
+                <span className="text-[14px] font-bold text-led-green uppercase tracking-wider">
                   &gt;&gt; Tape-deck / URL Receiver
                 </span>
-                <span className="text-[9px] text-zinc-500">SRC: YOUTUBE</span>
+                <span className="text-[11px] text-zinc-500">SRC: YOUTUBE</span>
               </div>
 
-              <div className="bevel-in bg-black px-2 py-1">
-                <div className="text-[9px] text-zinc-500 uppercase">&gt; Paste playlist url below</div>
-                <form onSubmit={handleFetchPlaylist} className="flex flex-col gap-3 pt-2">
-                  <div className="bevel-up bg-black px-2 py-1 flex items-center gap-2">
-                    <span className="text-[10px] text-led-cyan">URL&gt;</span>
+              <div className="bevel-in bg-black px-3 py-2">
+                <div className="text-[11px] text-zinc-500 uppercase">&gt; Paste playlist url below</div>
+                <form onSubmit={handleFetchPlaylist} className="flex flex-col gap-4 pt-2">
+                  <div className="bevel-up bg-black px-3 py-2 flex items-center gap-2">
+                    <span className="text-[12px] text-led-cyan">URL&gt;</span>
                     <input
                       type="text"
                       placeholder="https://www.youtube.com/playlist?list=..."
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
-                      className="flex-1 bg-transparent font-mono text-[12px] text-led-green placeholder-zinc-600 focus:outline-none caret-led-green"
+                      className="flex-1 bg-transparent font-mono text-[14px] text-led-green placeholder-zinc-600 focus:outline-none caret-led-green"
                       required
                     />
                   </div>
 
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-5">
                       <Led label="READY" active={!loading && !error} />
                       <Led label="BUSY" active={loading} color="#ffb000" blink={loading} />
                       <Led label="ERR" active={!!error} color="#ff3355" blink={!!error} />
@@ -374,10 +374,10 @@ export default function App() {
                 </form>
               </div>
 
-              <div className="bevel-in bg-black px-3 py-2 flex items-center gap-4">
+              <div className="bevel-in bg-black px-4 py-3 flex items-center gap-5">
                 <Led label="PWR" active color="#00ff66" />
                 <Led label="LINK" active color="#00e5ff" />
-                <span className="text-[9px] text-zinc-600 uppercase tracking-wider">
+                <span className="text-[11px] text-zinc-600 uppercase tracking-wider">
                   Max 50 tracks per rip · 192kbps encode
                 </span>
               </div>
@@ -387,60 +387,60 @@ export default function App() {
           {/* STEP 2: Preview & Select Tracks */}
           {step === "preview" && playlist && (
             <div className="flex flex-col gap-3">
-              <div className="bevel-in bg-black px-3 py-2 flex flex-col gap-1.5">
+              <div className="bevel-in bg-black px-4 py-3 flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[12px] font-bold text-led-green uppercase truncate">
+                  <span className="text-[16px] font-bold text-led-green uppercase truncate">
                     {playlist.playlist_title}
                   </span>
-                  <span className="text-[10px] text-zinc-500 whitespace-nowrap">
+                  <span className="text-[12px] text-zinc-500 whitespace-nowrap">
                     {playlist.returned_tracks}/{playlist.total_tracks_in_playlist} ITEMS
                     {playlist.truncated ? " (CAP 50)" : ""}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[9px] text-zinc-500 uppercase">&gt; Tracks ready for selection</span>
+                  <span className="text-[11px] text-zinc-500 uppercase">&gt; Tracks ready for selection</span>
                   <Led label={`${selectedIds.size} SEL`} active={selectedIds.size > 0} color="#00e5ff" />
                 </div>
               </div>
 
               <div className="bevel-in bg-black">
-                <div className="flex items-center gap-2 px-2 py-1.5 border-b-2 border-black bg-[#141418] font-mono text-[10px] font-bold tracking-wider text-led-amber select-none">
-                  <span className="w-7">[x]</span>
+                <div className="flex items-center gap-2 px-3 py-2 border-b-2 border-black bg-[#141418] font-mono text-[12px] font-bold tracking-wider text-led-amber select-none">
+                  <span className="w-8">[x]</span>
                   <span className="flex-1">TRACK TITLE</span>
-                  <span className="w-14 text-right">LEN</span>
-                  <span className="w-20 text-right">BITRATE</span>
+                  <span className="w-16 text-right">LEN</span>
+                  <span className="w-24 text-right">BITRATE</span>
                 </div>
-                <div className="max-h-[380px] overflow-y-auto">
+                <div className="max-h-[480px] overflow-y-auto">
                   {playlist.tracks.map((t, i) => {
                     const isSelected = selectedIds.has(t.id);
                     return (
                       <div
                         key={t.id}
                         onClick={() => toggleSelect(t.id)}
-                        className={`flex items-center gap-2 px-2 py-1 font-mono text-[11px] cursor-pointer select-none border-b border-zinc-900 ${
+                        className={`flex items-center gap-2 px-3 py-1.5 font-mono text-[13px] cursor-pointer select-none border-b border-zinc-900 ${
                           i % 2 ? "bg-zinc-900/70" : "bg-black"
                         } ${
                           isSelected ? "text-led-green" : "text-zinc-500 hover:text-zinc-200"
                         }`}
                       >
-                        <span className="w-7">{isSelected ? "[+]" : "[ ]"}</span>
+                        <span className="w-8">{isSelected ? "[+]" : "[ ]"}</span>
                         <span className="flex-1 truncate">{t.title}</span>
-                        <span className="w-14 text-right text-zinc-400">
+                        <span className="w-16 text-right text-zinc-400">
                           {formatDuration(t.duration)}
                         </span>
-                        <span className="w-20 text-right text-led-cyan">192k</span>
+                        <span className="w-24 text-right text-led-cyan">192k</span>
                       </div>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-3 flex-wrap">
                 <RetroButton onClick={toggleSelectAll}>
                   {selectedIds.size === playlist.tracks.length ? "CLEAR" : "SELECT ALL"}
                 </RetroButton>
                 <RetroButton tone="primary" onClick={handleStartDownload} disabled={selectedIds.size === 0 || loading}>
-                  {loading ? "RIPPING..." : `RIP MP3s (${selectedIds.size})`}
+                  {loading ? "CONVERTING..." : `CONVERT MP3s (${selectedIds.size})`}
                 </RetroButton>
               </div>
             </div>
@@ -449,15 +449,15 @@ export default function App() {
           {/* STEP 3: Active Processing & SSE Streaming */}
           {step === "processing" && (
             <div className="flex flex-col gap-3">
-              <div className="bevel-in bg-black px-3 py-2 flex items-center justify-between gap-2">
-                <span className="text-[12px] font-bold text-led-green uppercase">
+              <div className="bevel-in bg-black px-4 py-3 flex items-center justify-between gap-2">
+                <span className="text-[14px] font-bold text-led-green uppercase">
                   &gt;&gt; Tape deck active — rip sequence running
                 </span>
                 <Led label="REC" active color="#ff3355" blink />
               </div>
 
-              <div className="bevel-in bg-black p-2 flex flex-col gap-2 max-h-[460px] overflow-y-auto">
-                <div className="text-[10px] text-zinc-500">
+              <div className="bevel-in bg-black p-2.5 flex flex-col gap-2.5 max-h-[560px] overflow-y-auto">
+                <div className="text-[12px] text-zinc-500">
                   &gt; JOB STATUS: <span className="text-led-amber uppercase">{jobStatus}</span>
                 </div>
                 {Array.from(selectedIds).map((vid) => {
@@ -465,8 +465,8 @@ export default function App() {
                   const originalMeta = playlist?.tracks.find((t) => t.id === vid);
 
                   return (
-                    <div key={vid} className="border border-zinc-900 p-2 flex flex-col gap-1.5 bg-zinc-950/50">
-                      <div className="flex items-center justify-between gap-2 font-mono text-[10px]">
+                    <div key={vid} className="border border-zinc-900 p-2.5 flex flex-col gap-1.5 bg-zinc-950/50">
+                      <div className="flex items-center justify-between gap-2 font-mono text-[12px]">
                         <span className="truncate text-zinc-200">{originalMeta?.title || vid}</span>
                         <span className="flex items-center gap-2 whitespace-nowrap">
                           <StatusTag status={track.status} />
@@ -503,28 +503,28 @@ export default function App() {
           {/* STEP 4: Completed View */}
           {step === "completed" && (
             <div className="flex flex-col items-center gap-4 text-center">
-              <div className="bevel-in bg-black w-full px-3 py-4 flex flex-col items-center gap-1">
-                <span className="font-bitmap text-[18px] font-bold tracking-widest text-led-green">
+              <div className="bevel-in bg-black w-full px-3 py-6 flex flex-col items-center gap-1.5">
+                <span className="font-bitmap text-[24px] font-bold tracking-widest text-led-green">
                   RIPPING COMPLETE
                 </span>
-                <span className="text-[10px] text-zinc-400 uppercase tracking-wider">
+                <span className="text-[12px] text-zinc-400 uppercase tracking-wider">
                   All tracks cached — archive ready
                 </span>
               </div>
 
-              <div className="bevel-in bg-black w-full px-3 py-2 font-mono text-[10px] text-zinc-300 flex flex-wrap justify-center gap-x-5 gap-y-1 uppercase">
+              <div className="bevel-in bg-black w-full px-4 py-3 font-mono text-[13px] text-zinc-300 flex flex-wrap justify-center gap-x-6 gap-y-1.5 uppercase">
                 <span>Tracks Encoded: <span className="text-led-green font-bold">{doneCount}</span></span>
                 <span>Skipped: <span className="text-led-red font-bold">{failedCount}</span></span>
                 <span>Format: <span className="text-led-cyan font-bold">MPEG-1 L3</span></span>
               </div>
 
               {failedTracks.length > 0 && (
-                <div className="w-full bevel-in bg-black p-2 flex flex-col gap-1.5 text-left max-h-44 overflow-y-auto">
-                  <div className="text-[10px] font-bold text-led-red">
+                <div className="w-full bevel-in bg-black p-2.5 flex flex-col gap-1.5 text-left max-h-48 overflow-y-auto">
+                  <div className="text-[12px] font-bold text-led-red">
                     &gt; {failedTracks.length} TRACK(S) FAILED:
                   </div>
                   {failedTracks.map((t) => (
-                    <div key={t.vid} className="flex flex-col font-mono text-[10px] border-t border-zinc-900 pt-1.5">
+                    <div key={t.vid} className="flex flex-col font-mono text-[12px] border-t border-zinc-900 pt-1.5">
                       <span className="text-zinc-300 truncate">{t.title || t.vid}</span>
                       <span className="text-led-red">&gt; {t.error || "UNKNOWN ERROR"}</span>
                     </div>
@@ -535,7 +535,7 @@ export default function App() {
               <a
                 href={`${API_BASE}/api/jobs/${jobId}/download`}
                 download
-                className="bevel-up chisel-bg px-6 py-3 font-mono font-bold text-[13px] text-led-green uppercase tracking-widest text-center"
+                className="bevel-up chisel-bg px-8 py-4 font-mono font-bold text-[15px] text-led-green uppercase tracking-widest text-center"
               >
                 ↓ DOWNLOAD ARCHIVE (.ZIP)
               </a>
@@ -544,7 +544,7 @@ export default function App() {
         </div>
 
         {/* Status Bar */}
-        <div className="flex items-center justify-between gap-2 px-2 h-7 border-t-2 border-black bg-[#0d0d11] font-mono text-[9px] text-zinc-500 uppercase select-none">
+        <div className="flex items-center justify-between gap-2 px-2 h-8 border-t-2 border-black bg-[#0d0d11] font-mono text-[11px] text-zinc-500 uppercase select-none">
           <span className="flex items-center gap-2 min-w-0">
             <span
               className="led"
