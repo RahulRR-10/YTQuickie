@@ -310,6 +310,21 @@ export default function App() {
     setError(null);
   };
 
+  // 5b. Go back to the previous step
+  const goBack = async () => {
+    if (step === "processing") {
+      await handleCancelJob();
+    } else if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+    setError(null);
+    if (step === "completed") {
+      setStep("preview");
+    } else if (step === "preview") {
+      setStep("input");
+    }
+  };
+
   // 6. Window controls (desktop only; browser falls back to reset)
   const isDesktop = !!window.pywebview?.api;
   const handleMinimize = () => {
@@ -374,6 +389,12 @@ export default function App() {
         <MenuStrip />
 
         <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 p-3 sm:p-4">
+          {step !== "input" && (
+            <div className="flex items-center justify-between gap-2">
+              <RetroButton onClick={goBack} disabled={loading}>← BACK</RetroButton>
+            </div>
+          )}
+
           {/* Error Alert */}
           {error && (
             <div className="bevel-in bg-black p-3 flex items-start gap-2 text-led-red">
