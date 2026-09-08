@@ -226,13 +226,16 @@ async def run_job(job_id: str, selected_ids: List[str], titles: Dict[str, str]):
         shutil.rmtree(job_dir, ignore_errors=True)
         return
 
-    zip_base = os.path.join(BASE_DOWNLOAD_DIR, f"{job_id}_archive")
-    loop = asyncio.get_running_loop()
-    zip_path = await loop.run_in_executor(
-        None, shutil.make_archive, zip_base, "zip", job_dir
-    )
+    if len(selected_ids) == 1:
+        result_path = jobs[job_id]["tracks"][selected_ids[0]].get("file_path")
+    else:
+        zip_base = os.path.join(BASE_DOWNLOAD_DIR, f"{job_id}_archive")
+        loop = asyncio.get_running_loop()
+        result_path = await loop.run_in_executor(
+            None, shutil.make_archive, zip_base, "zip", job_dir
+        )
 
-    jobs[job_id]["zip_path"] = zip_path
+    jobs[job_id]["result_path"] = result_path
     jobs[job_id]["status"] = "completed"
     jobs[job_id]["completed_at"] = time.time()
     await publish_event(job_id, {"type": "job_status", "status": "completed"})
@@ -248,9 +251,9 @@ async def cleanup_loop():
             if completed_at and now - completed_at > JOB_TTL_SECONDS:
                 job_dir = os.path.join(BASE_DOWNLOAD_DIR, job_id)
                 shutil.rmtree(job_dir, ignore_errors=True)
-                zip_path = job.get("zip_path")
-                if zip_path and os.path.exists(zip_path):
-                    os.remove(zip_path)
+                result_path = job.get("result_path")
+                if result_path and os.path.exists(result_path):
+                    os.remove(result_path)
                 jobs.pop(job_id, None)
                 job_subscribers.pop(job_id, None)
                 job_cancel_flags.pop(job_id, None)
@@ -364,7 +367,7 @@ def create_job(req: StartJobRequest, bg_tasks: BackgroundTasks):
             vid: {"video_id": vid, "status": "pending", "progress": 0}
             for vid in req.video_ids
         },
-        "zip_path": None,
+        "result_path": None,
         "completed_at": None,
     }
     job_subscribers[job_id] = []
@@ -410,11 +413,22 @@ async def stream_job_progress(job_id: str):
 @app.get("/api/jobs/{job_id}/download")
 def download_archive(job_id: str):
     job = jobs.get(job_id)
-    if not job or not job.get("zip_path"):
-        raise HTTPException(status_code=404, detail="Archive not ready or job expired")
+    if not job or not job.get("result_path"):
+        raise HTTPException(status_code=404, detail="Result not ready or job expired")
+
+    result_path = job["result_path"]
+    if not os.path.exists(result_path):
+        raise HTTPException(status_code=404, detail="Result file is missing")
+
+    if os.path.splitext(result_path)[1].lower() == ".mp3":
+        return FileResponse(
+            path=result_path,
+            filename=os.path.basename(result_path),
+            media_type="audio/mpeg",
+        )
 
     return FileResponse(
-        path=job["zip_path"],
+        path=result_path,
         filename=f"playlist_{job_id[:8]}.zip",
         media_type="application/zip",
     )
@@ -432,8 +446,8 @@ async def cancel_job(job_id: str):
     if job["status"] in ("completed",):
         # already done — just clean up files, keep record briefly
         shutil.rmtree(job_dir, ignore_errors=True)
-        if job.get("zip_path") and os.path.exists(job["zip_path"]):
-            os.remove(job["zip_path"])
+        if job.get("result_path") and os.path.exists(job["result_path"]):
+            os.remove(job["result_path"])
         jobs.pop(job_id, None)
         job_subscribers.pop(job_id, None)
         job_cancel_flags.pop(job_id, None)

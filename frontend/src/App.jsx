@@ -400,6 +400,7 @@ export default function App() {
 
   const failedCount = Object.values(tracksStatus).filter((t) => t.status === "failed").length;
   const doneCount = Object.values(tracksStatus).filter((t) => t.status === "done").length;
+  const isSingle = selectedIds.size === 1;
   const failedTracks = Array.from(selectedIds)
     .map((vid) => ({ vid, ...(playlist?.tracks.find((t) => t.id === vid) || {}) }))
     .filter((t) => tracksStatus[t.vid]?.status === "failed")
@@ -637,7 +638,7 @@ export default function App() {
                   RIPPING COMPLETE
                 </span>
                 <span className="text-[12px] text-zinc-400 uppercase tracking-wider">
-                  All tracks cached — archive ready
+                  {isSingle ? "Track cached — MP3 ready" : "All tracks cached — archive ready"}
                 </span>
               </div>
 
@@ -672,7 +673,14 @@ export default function App() {
                 onClick={handleDownloadArchive}
                 className="bevel-up chisel-bg px-8 py-4 font-mono font-bold text-[15px] text-led-green uppercase tracking-widest text-center"
               >
-                ↓ DOWNLOAD ARCHIVE (.ZIP)
+                {isSingle ? "↓ DOWNLOAD MP3" : "↓ DOWNLOAD ARCHIVE (.ZIP)"}
+              </button>
+
+              <button
+                onClick={handleReset}
+                className="bevel-up chisel-bg px-6 py-2 font-mono font-bold text-[12px] text-zinc-300 uppercase tracking-widest text-center"
+              >
+                CONVERT AGAIN
               </button>
             </div>
           )}

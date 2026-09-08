@@ -57,13 +57,13 @@ class JsApi:
         return result[0] if isinstance(result, (tuple, list)) else result
 
     def download_zip(self, job_id: str) -> str:
-        """Copy the finished archive to the configured download folder. Returns a JSON string."""
+        """Copy the finished result file to the configured download folder. Returns a JSON string."""
         job = jobs.get(job_id)
-        if not job or not job.get("zip_path"):
-            return json.dumps({"ok": False, "error": "Archive not ready yet."})
-        src = job["zip_path"]
+        if not job or not job.get("result_path"):
+            return json.dumps({"ok": False, "error": "Result not ready yet."})
+        src = job["result_path"]
         if not os.path.exists(src):
-            return json.dumps({"ok": False, "error": "Archive file is missing."})
+            return json.dumps({"ok": False, "error": "Result file is missing."})
 
         dest_dir = get_configured_download_dir()
         try:
