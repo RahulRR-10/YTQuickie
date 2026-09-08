@@ -242,8 +242,37 @@ def fetch_playlist_metadata(req: FetchRequest):
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(req.url, download=False)
+
             if "entries" not in info:
-                raise HTTPException(status_code=400, detail="Provided URL is not a playlist.")
+                title = info.get("title", "")
+                video_id = info.get("id")
+                if (
+                    not video_id
+                    or not title
+                    or title in ("[Private video]", "[Deleted video]")
+                    or info.get("availability")
+                    in ("private", "subscriber_only", "needs_auth")
+                ):
+                    raise HTTPException(
+                        status_code=400, detail="Could not retrieve video information."
+                    )
+                return {
+                    "playlist_title": title,
+                    "total_tracks_in_playlist": 1,
+                    "returned_tracks": 1,
+                    "truncated": False,
+                    "max_tracks": MAX_TRACKS,
+                    "tracks": [
+                        {
+                            "id": video_id,
+                            "title": title or "Unknown Title",
+                            "duration": info.get("duration"),
+                            "thumbnail": info.get("thumbnails", [{}])[0].get("url")
+                            if info.get("thumbnails")
+                            else None,
+                        }
+                    ],
+                }
 
             entries = [e for e in info["entries"] if e]
             items = []

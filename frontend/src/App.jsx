@@ -346,7 +346,7 @@ export default function App() {
     .map((t) => ({ vid: t.vid, title: t.title, error: tracksStatus[t.vid].error }));
 
   const statusLine =
-    step === "input" ? "AWAITING PLAYLIST URL"
+    step === "input" ? "AWAITING URL"
     : step === "preview" ? `SELECTED ${selectedIds.size}/${playlist ? playlist.returned_tracks : 0}`
     : step === "processing" ? `JOB ${jobStatus || "-"}`
     : "ARCHIVE READY";
@@ -414,13 +414,13 @@ export default function App() {
               </div>
 
               <div className="bevel-in bg-black px-3 py-2">
-                <div className="text-[11px] text-zinc-500 uppercase">&gt; Paste playlist url below</div>
+                <div className="text-[11px] text-zinc-500 uppercase">&gt; Paste YouTube URL below</div>
                 <form onSubmit={handleFetchPlaylist} className="flex flex-col gap-4 pt-2">
                   <div className="bevel-up bg-black px-3 py-2 flex items-center gap-2">
                     <span className="text-[12px] text-led-cyan">URL&gt;</span>
                     <input
                       type="text"
-                      placeholder="https://www.youtube.com/playlist?list=..."
+                      placeholder="YouTube playlist or video URL"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
                       className="flex-1 bg-transparent font-mono text-[14px] text-led-green placeholder-zinc-600 focus:outline-none caret-led-green"
