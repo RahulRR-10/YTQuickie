@@ -4,6 +4,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import time
 import urllib.parse
 import urllib.request
@@ -130,10 +131,19 @@ async def publish_event(job_id: str, payload: dict):
 
 
 # --- Core Worker Logic ---
+def _ffmpeg_location():
+    if getattr(sys, "frozen", False):
+        bundled = os.path.join(getattr(sys, "_MEIPASS", ""), "ffmpeg")
+        if os.path.isdir(bundled):
+            return bundled
+    return None
+
+
 def run_ytdl_download(video_id: str, output_path: str, progress_cb):
     ydl_opts = {
         "format": "bestaudio/best",
         "outtmpl": output_path,
+        "ffmpeg_location": _ffmpeg_location(),
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -725,6 +735,7 @@ def update_settings(req: SettingsRequest):
 
 # --- Static frontend (built React app) ---
 # Mounted last so /api/* routes above are matched first.
-STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+_APP_ROOT = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(_APP_ROOT, "static")
 if os.path.isdir(STATIC_DIR):
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

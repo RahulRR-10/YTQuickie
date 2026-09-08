@@ -95,6 +95,8 @@ def main() -> None:
                         help=f"Port to serve the app on (default: {DEFAULT_PORT})")
     parser.add_argument("--debug", action="store_true",
                         help="Keep uvicorn in reload mode and show the dev console")
+    parser.add_argument("--headless", action="store_true",
+                        help="Run the server without opening a window (for testing)")
     args = parser.parse_args()
 
     port = _free_port(args.port)
@@ -111,6 +113,16 @@ def main() -> None:
         time.sleep(0.05)
 
     url = f"http://{HOST}:{port}"
+
+    if args.headless:
+        print(f"YTQuickie headless server running at {url} (Ctrl+C to stop)")
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
+        server.should_exit = True
+        return
 
     window = webview.create_window(
         WINDOW_TITLE,

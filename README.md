@@ -37,10 +37,16 @@ A retro-styled YouTube/Spotify **URL → MP3** ripper that runs as a frameless d
 
 ## Getting Started
 
-### Prerequisites
+### Download the release (no install needed)
+
+Grab the latest **YTQuickie-windows-x64.zip** from the [Releases](https://github.com/RahulRR-10/YTQuickie/releases) page, extract it anywhere, and run `YTQuickie.exe`. FFmpeg is bundled, so no extra installs are required.
+
+> SmartScreen may warn "Windows protected your PC" because the app isn't code-signed — click **More info → Run anyway**.
+
+### Prerequisites (running from source)
 
 - [Python 3.11+](https://www.python.org/downloads/)
-- [Node.js 18+](https://nodejs.org/)
+- [Node.js 22+](https://nodejs.org/) (Vite 8 requires ^20.19 or >=22.12)
 - [FFmpeg](https://ffmpeg.org/) on your PATH (used for MP3 encoding)
 - Microsoft Edge WebView2 runtime (preinstalled on Windows 10/11)
 
@@ -105,6 +111,29 @@ YTQ/
 - Click **Settings** in the menu bar to view/change the **Download location** (default: your `Downloads` folder).
 - Desktop: pick a folder with `[BROWSE FOLDER]` (or type a path). Browser mode: type the path directly.
 - Persisted to `~/.ytquickie/config.json`; the folder is created if it doesn't exist.
+
+## Building a Release (Windows .exe)
+
+Releases are built automatically by GitHub Actions — push a tag and the `v*` workflow builds, zips, and attaches `YTQuickie-windows-x64.zip`:
+
+```bash
+git tag v1.0.0 && git push origin main --tags
+```
+
+To build locally instead:
+
+```bash
+# 1. Build the frontend
+cd frontend && npm ci && npm run build && cd ..
+
+# 2. Drop FFmpeg binaries in place (release/ is gitignored)
+mkdir release\ffmpeg   # copy ffmpeg.exe + ffprobe.exe here
+
+# 3. Build the app (backend/YTQuickie.spec is committed)
+pip install -r backend/requirements.txt pyinstaller
+pyinstaller backend/YTQuickie.spec --noconfirm
+# → dist/YTQuickie/
+```
 
 ## Notes & Limitations
 

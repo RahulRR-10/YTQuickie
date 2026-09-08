@@ -4,6 +4,13 @@ __pycache__/
 backend/.venv/
 venv/
 
+# PyInstaller build output (keep backend/YTQuickie.spec committed)
+build/
+dist/
+backend/build/
+backend/dist/
+backend/*.egg-info/
+
 # Node
 frontend/node_modules/
 frontend/dist/
@@ -21,3 +28,6 @@ Thumbs.db
 /tmp/
 *.mp3
 *.zip
+
+# CI release staging (never commit ffmpeg binaries)
+/release/
