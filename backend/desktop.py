@@ -17,13 +17,23 @@ import uvicorn
 
 import webview
 
-from main import app, jobs
+from main import app, jobs, get_configured_download_dir
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8756
 WINDOW_TITLE = "YTQuickie v1.0 [Audio Ripper]"
 WINDOW_WIDTH = 820
 WINDOW_HEIGHT = 620
+
+
+def _unique_dest(directory: str, filename: str) -> str:
+    base, ext = os.path.splitext(filename)
+    candidate = os.path.join(directory, filename)
+    n = 1
+    while os.path.exists(candidate):
+        candidate = os.path.join(directory, f"{base} ({n}){ext}")
+        n += 1
+    return candidate
 
 
 class JsApi:
@@ -35,8 +45,19 @@ class JsApi:
     def close(self):
         webview.windows[0].destroy()
 
+    def select_download_folder(self) -> str:
+        """Open a folder picker; returns the selected path or '' if cancelled."""
+        start_dir = get_configured_download_dir()
+        result = webview.windows[0].create_file_dialog(
+            webview.FileDialog.FOLDER,
+            directory=start_dir,
+        )
+        if not result:
+            return ""
+        return result[0] if isinstance(result, (tuple, list)) else result
+
     def download_zip(self, job_id: str) -> str:
-        """Save the finished archive via a native dialog. Returns a JSON string."""
+        """Copy the finished archive to the configured download folder. Returns a JSON string."""
         job = jobs.get(job_id)
         if not job or not job.get("zip_path"):
             return json.dumps({"ok": False, "error": "Archive not ready yet."})
@@ -44,21 +65,14 @@ class JsApi:
         if not os.path.exists(src):
             return json.dumps({"ok": False, "error": "Archive file is missing."})
 
-        window = webview.windows[0]
-        dest = window.create_file_dialog(
-            webview.FileDialog.SAVE,
-            save_filename=os.path.basename(src),
-            file_types=("Zip archive (*.zip)",),
-        )
-        if not dest:
-            return json.dumps({"ok": False, "cancelled": True})
-
-        destination = dest[0] if isinstance(dest, (tuple, list)) else dest
+        dest_dir = get_configured_download_dir()
         try:
-            shutil.copyfile(src, destination)
+            os.makedirs(dest_dir, exist_ok=True)
+            dest = _unique_dest(dest_dir, os.path.basename(src))
+            shutil.copyfile(src, dest)
         except OSError as e:
             return json.dumps({"ok": False, "error": f"Could not save file: {e}"})
-        return json.dumps({"ok": True, "path": destination})
+        return json.dumps({"ok": True, "path": dest})
 
 
 def _free_port(preferred: int) -> int:

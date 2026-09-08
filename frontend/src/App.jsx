@@ -3,7 +3,6 @@ import React, { useState, useEffect, useRef } from "react";
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 const WINDOW_TITLE = "YTQuickie v1.0 [Audio Ripper]";
-const MENU_ITEMS = ["File", "Options", "Tools", "Help"];
 
 // --- Retro UI building blocks -------------------------------------------------
 
@@ -110,14 +109,15 @@ function TitleBar({ onMinimize, onClose, showReset, isDesktop }) {
   );
 }
 
-function MenuStrip() {
+function MenuStrip({ onSettings }) {
   return (
     <div className="flex gap-5 px-3 py-1.5 border-b-2 border-black bg-[#101014] font-mono text-[12px] text-zinc-300 select-none">
-      {MENU_ITEMS.map((m) => (
-        <span key={m} className="px-1 hover:bg-led-green hover:text-black cursor-default">
-          {m}
-        </span>
-      ))}
+      <span
+        onClick={onSettings}
+        className="px-1 hover:bg-led-green hover:text-black cursor-pointer"
+      >
+        Settings
+      </span>
     </div>
   );
 }
@@ -142,6 +142,12 @@ export default function App() {
   const [tracksStatus, setTracksStatus] = useState({});
   const eventSourceRef = useRef(null);
 
+  // Settings State
+  const [downloadDir, setDownloadDir] = useState("");
+  const [settingsSaved, setSettingsSaved] = useState(false);
+  const settingsReturnRef = useRef("input");
+  const [archivePath, setArchivePath] = useState(null);
+
   // Clean up SSE connection on unmount
   useEffect(() => {
     return () => {
@@ -149,6 +155,14 @@ export default function App() {
         eventSourceRef.current.close();
       }
     };
+  }, []);
+
+  // Load persisted settings on mount
+  useEffect(() => {
+    fetch(`${API_BASE}/api/settings`)
+      .then((r) => r.json())
+      .then((d) => setDownloadDir(d.download_dir || ""))
+      .catch(() => {});
   }, []);
 
   // Format track duration (seconds -> mm:ss)
@@ -308,6 +322,8 @@ export default function App() {
     setJobStatus(null);
     setTracksStatus({});
     setError(null);
+    setArchivePath(null);
+    setSettingsSaved(false);
   };
 
   // 5b. Go back to the previous step
@@ -338,6 +354,50 @@ export default function App() {
     }
   };
 
+  // 6b. Settings view
+  const openSettings = () => {
+    if (eventSourceRef.current) eventSourceRef.current.close();
+    settingsReturnRef.current = step;
+    setError(null);
+    setSettingsSaved(false);
+    setStep("settings");
+  };
+
+  const closeSettings = () => {
+    setError(null);
+    setStep(settingsReturnRef.current);
+  };
+
+  const handleSaveSettings = async () => {
+    setLoading(true);
+    setError(null);
+    setSettingsSaved(false);
+    try {
+      const res = await fetch(`${API_BASE}/api/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ download_dir: downloadDir }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Failed to save settings");
+      setDownloadDir(data.download_dir);
+      setSettingsSaved(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBrowseFolder = async () => {
+    try {
+      const raw = await window.pywebview.api.select_download_folder();
+      if (raw) setDownloadDir(raw);
+    } catch (err) {
+      setError(err.message || "Failed to select folder");
+    }
+  };
+
   const failedCount = Object.values(tracksStatus).filter((t) => t.status === "failed").length;
   const doneCount = Object.values(tracksStatus).filter((t) => t.status === "done").length;
   const failedTracks = Array.from(selectedIds)
@@ -347,19 +407,21 @@ export default function App() {
 
   const statusLine =
     step === "input" ? "AWAITING URL"
+    : step === "settings" ? "SETTINGS"
     : step === "preview" ? `SELECTED ${selectedIds.size}/${playlist ? playlist.returned_tracks : 0}`
     : step === "processing" ? `JOB ${jobStatus || "-"}`
     : "ARCHIVE READY";
 
-  // 7. Download archive (native save dialog in desktop, browser download as fallback)
+  // 7. Download archive (auto-save in desktop, browser download as fallback)
   const handleDownloadArchive = async () => {
     try {
       if (window.pywebview?.api) {
         const raw = await window.pywebview.api.download_zip(jobId);
         const res = typeof raw === "string" ? JSON.parse(raw) : raw;
         if (res?.ok) {
+          setArchivePath(res.path);
           setError(null);
-        } else if (!res?.cancelled) {
+        } else {
           setError(res?.error || "Download failed");
         }
       } else {
@@ -386,10 +448,10 @@ export default function App() {
           showReset={step !== "input"}
           isDesktop={isDesktop}
         />
-        <MenuStrip />
+        <MenuStrip onSettings={openSettings} />
 
         <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 p-3 sm:p-4">
-          {step !== "input" && (
+          {step !== "input" && step !== "settings" && (
             <div className="flex items-center justify-between gap-2">
               <RetroButton onClick={goBack} disabled={loading}>← BACK</RetroButton>
             </div>
@@ -599,12 +661,68 @@ export default function App() {
                 </div>
               )}
 
+              {archivePath && (
+                <div className="w-full bevel-in bg-black px-3 py-2 flex flex-col gap-1 text-left">
+                  <span className="text-[12px] font-bold text-led-green">&gt;&gt; SAVED TO:</span>
+                  <span className="text-[12px] text-zinc-300 break-all">{archivePath}</span>
+                </div>
+              )}
+
               <button
                 onClick={handleDownloadArchive}
                 className="bevel-up chisel-bg px-8 py-4 font-mono font-bold text-[15px] text-led-green uppercase tracking-widest text-center"
               >
                 ↓ DOWNLOAD ARCHIVE (.ZIP)
               </button>
+            </div>
+          )}
+
+          {/* STEP 5: Settings */}
+          {step === "settings" && (
+            <div className="flex flex-col gap-3">
+              <div className="bevel-in bg-black px-4 py-3 flex items-center justify-between gap-2">
+                <span className="text-[14px] font-bold text-led-green uppercase tracking-wider">
+                  &gt;&gt; Settings / Configuration
+                </span>
+                <span className="text-[11px] text-zinc-500">SYS: CONFIG</span>
+              </div>
+
+              <div className="bevel-in bg-black px-3 py-2">
+                <div className="text-[11px] text-zinc-500 uppercase">&gt; Download location</div>
+                <div className="flex flex-col gap-3 pt-2">
+                  <div className="bevel-up bg-black px-3 py-2 flex items-center gap-2">
+                    <span className="text-[12px] text-led-cyan">DIR&gt;</span>
+                    <input
+                      type="text"
+                      value={downloadDir}
+                      onChange={(e) => setDownloadDir(e.target.value)}
+                      placeholder="Default: Downloads folder"
+                      className="flex-1 bg-transparent font-mono text-[13px] text-led-green placeholder-zinc-600 focus:outline-none caret-led-green"
+                    />
+                  </div>
+
+                  {isDesktop && (
+                    <RetroButton onClick={handleBrowseFolder} disabled={loading}>
+                      [BROWSE FOLDER]
+                    </RetroButton>
+                  )}
+
+                  {settingsSaved && (
+                    <div className="bevel-in bg-black p-2 text-led-green text-[12px]">
+                      &gt;&gt; SETTINGS SAVED
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <RetroButton tone="primary" onClick={handleSaveSettings} disabled={loading}>
+                      {loading ? "SAVING..." : "SAVE SETTINGS"}
+                    </RetroButton>
+                    <RetroButton onClick={closeSettings} disabled={loading}>
+                      ← BACK
+                    </RetroButton>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

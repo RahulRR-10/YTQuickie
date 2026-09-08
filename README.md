@@ -4,7 +4,9 @@ A retro-styled YouTube **playlist → MP3** ripper that runs as a frameless desk
 
 > Paste a playlist URL, pick your tracks, and rip them as **192kbps MP3s** with a CRT terminal vibe — all packed into a single download.
 
-![Main screen — URL input](screenshots/main-screen-url-input.png)
+<p align="center">
+  <img src="screenshots/main-screen-url-input.png" alt="Main screen — URL input" width="500">
+</p>
 
 ## Features
 
@@ -25,9 +27,11 @@ A retro-styled YouTube **playlist → MP3** ripper that runs as a frameless desk
 
 ## Screenshots
 
-![Playlist viewer & selector](screenshots/playlist-viewer-selector.png)
-![Conversion & encoding progress](screenshots/conversion-encoding.png)
-![Download archive screen](screenshots/download-screen.png)
+<p align="center">
+  <img src="screenshots/playlist-viewer-selector.png" alt="Playlist viewer & selector" width="500"><br>
+  <img src="screenshots/conversion-encoding.png" alt="Conversion & encoding progress" width="500"><br>
+  <img src="screenshots/download-screen.png" alt="Download archive screen" width="500">
+</p>
 
 ## Getting Started
 

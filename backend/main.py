@@ -31,6 +31,32 @@ BASE_DOWNLOAD_DIR = os.path.join(
 )
 os.makedirs(BASE_DOWNLOAD_DIR, exist_ok=True)
 
+CONFIG_PATH = os.path.join(str(Path.home() / ".ytquickie"), "config.json")
+DEFAULT_DOWNLOAD_DIR = str(Path.home() / "Downloads")
+
+
+def load_config() -> dict:
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        if not isinstance(cfg, dict):
+            cfg = {}
+    except (FileNotFoundError, json.JSONDecodeError):
+        cfg = {}
+    cfg.setdefault("download_dir", "")
+    return cfg
+
+
+def save_config(cfg: dict) -> None:
+    os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2)
+
+
+def get_configured_download_dir() -> str:
+    cfg = load_config()
+    return cfg.get("download_dir") or DEFAULT_DOWNLOAD_DIR
+
 CONCURRENCY_LIMIT = 4
 semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
 
@@ -47,6 +73,10 @@ job_cancel_flags: Dict[str, bool] = {}
 # --- Models ---
 class FetchRequest(BaseModel):
     url: str
+
+
+class SettingsRequest(BaseModel):
+    download_dir: str
 
 
 class StartJobRequest(BaseModel):
@@ -412,6 +442,26 @@ async def cancel_job(job_id: str):
     job["status"] = "cancelling"
     await publish_event(job_id, {"type": "job_status", "status": "cancelling"})
     return {"status": "cancelling"}
+
+
+@app.get("/api/settings")
+def get_settings():
+    return {"download_dir": get_configured_download_dir()}
+
+
+@app.put("/api/settings")
+def update_settings(req: SettingsRequest):
+    path = req.download_dir.strip() or ""
+    if path:
+        path = os.path.abspath(os.path.expanduser(path))
+        try:
+            os.makedirs(path, exist_ok=True)
+        except OSError as e:
+            raise HTTPException(status_code=400, detail=f"Cannot use folder: {e}")
+    cfg = load_config()
+    cfg["download_dir"] = path
+    save_config(cfg)
+    return {"download_dir": get_configured_download_dir()}
 
 
 # --- Static frontend (built React app) ---
