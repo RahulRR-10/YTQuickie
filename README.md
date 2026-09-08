@@ -7,7 +7,6 @@
 Paste a link, pick your tracks, and get clean 192 kbps MP3s — no Python, no Node.js, no API keys, no setup. Download a single song or grab an entire playlist or album in one shot.
 
 [![Platform](https://img.shields.io/badge/platform-Windows-blue)](#download)
-[![License](https://img.shields.io/badge/license-MIT-green)](#license)
 [![Made with](https://img.shields.io/badge/backend-FastAPI-009688)](#tech-stack)
 [![Made with](https://img.shields.io/badge/frontend-React-61DAFB)](#tech-stack)
 
@@ -32,7 +31,6 @@ Paste a link, pick your tracks, and get clean 192 kbps MP3s — no Python, no No
 - [Tech Stack](#tech-stack)
 - [Disclaimer](#disclaimer)
 - [Contributing](#contributing)
-- [License](#license)
 
 ---
 
@@ -268,10 +266,6 @@ Found a bug or have an idea?
 Check out the [GitHub repository](https://github.com/RahulRR-10/YTQuickie) to get started.
 
 ---
-
-## License
-
-MIT — see [LICENSE](LICENSE) for details.
 
 <p align="center">
 <strong>YTQuickie</strong><br>
