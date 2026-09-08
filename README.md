@@ -84,7 +84,16 @@ Then open `http://localhost:5173` (or `http://localhost:8000` after `npm run bui
 
 ## Usage Guide (End to End)
 
-### 1. What you can paste
+### 1. Get the app (from GitHub Releases)
+
+1. Open **https://github.com/RahulRR-10/YTQuickie/releases** and find the latest `v*` release.
+2. Under **Assets**, click **`YTQuickie-windows-x64.zip`** to download it (~100 MB).
+3. Right-click the zip → **Extract All** (anywhere — `Desktop\YTQuickie`, Downloads, etc.).
+4. Open the extracted folder and double-click **`YTQuickie.exe`**. That's it — no FFmpeg, no Python, no install.
+
+> Microsoft Edge WebView2 is preinstalled on Windows 10/11. If SmartScreen shows "Windows protected your PC" (the app isn't code-signed), click **More info → Run anyway**.
+
+### 2. What you can paste
 
 | Source | Example URL |
 |--------|-------------|
@@ -96,14 +105,13 @@ Then open `http://localhost:5173` (or `http://localhost:8000` after `npm run bui
 
 > **Spotify needs no account/credentials** — the app scrapes the public embed page for track metadata and maps each track to its YouTube audio.
 
-### 2. Rip a track or playlist
+### 3. Rip a track or playlist
 
-1. Launch `YTQuickie.exe` (or `python desktop.py`).
-2. Paste the URL into the input and press **`FETCH TRACKS`**. The `READY`/`BUSY`/`ERR` LEDs show what's happening.
-3. **Preview & select** — the tracks list shows `TRACK TITLE · LEN · 192k`. Tick the ones you want (max 50), or hit **`SELECT ALL`** / **`CLEAR`**. Tracks that couldn't be matched to a YouTube audio are listed as *skipped*.
-4. Press **`CONVERT MP3s (N)`** to start. Each track streams live: `RIP → ENC → OK` along a retro segment bar; you can **`[ABORT OPERATION]`** mid-run.
+1. Paste the URL into the input and press **`FETCH TRACKS`**. The `READY`/`BUSY`/`ERR` LEDs show what's happening.
+2. **Preview & select** — the tracks list shows `TRACK TITLE · LEN · 192k`. Tick the ones you want (max 50), or hit **`SELECT ALL`** / **`CLEAR`**. Tracks that couldn't be matched to a YouTube audio are listed as *skipped*.
+3. Press **`CONVERT MP3s (N)`** to start. Each track streams live: `RIP → ENC → OK` along a retro segment bar; you can **`[ABORT OPERATION]`** mid-run.
 
-### 3. Get your files
+### 4. Get your files
 
 - When the rip completes you land on the **RIPPING COMPLETE** screen (`Tracks Encoded · Skipped · Format: MPEG-1 L3`).
 - **Single video/track** → `↓ DOWNLOAD MP3` saves the `.mp3` directly.
@@ -111,7 +119,7 @@ Then open `http://localhost:5173` (or `http://localhost:8000` after `npm run bui
 - **Nothing needs clicking to save on the desktop app** — on completion the file is auto-copied to your download folder (default `~/Downloads`), and the screen shows `>> SAVED TO: <path>`. If a file with the same name already exists, a numbered copy (`Song (2).mp3`) is created instead of overwriting.
 - **`CONVERT AGAIN`** returns you to the URL input for the next rip.
 
-### 4. Change where files go (Settings)
+### 5. Change where files go (Settings)
 
 1. Open **`SETTINGS`** from the menu bar.
 2. Under `DIR>` type a path or click **`[BROWSE FOLDER]`** (desktop) to pick one.
