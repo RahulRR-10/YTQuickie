@@ -1,189 +1,279 @@
-# YTQuickie
+<div align="center">
 
-A retro-styled YouTube/Spotify **URL → MP3** ripper that runs as a frameless desktop app (pywebview/WebView2) with a FastAPI + React backend.
+# 🎵 YTQuickie
 
-> Paste a YouTube or Spotify URL (single track, album, or playlist), pick your tracks, and rip them as **192kbps MP3s** with a CRT terminal vibe.
+**A simple desktop app for ripping audio from YouTube and Spotify.**
 
-<p align="center">
-  <img src="screenshots/main-screen-url-input.png" alt="Main screen — URL input" width="500">
-</p>
+Paste a link, pick your tracks, and get clean 192 kbps MP3s — no Python, no Node.js, no API keys, no setup. Download a single song or grab an entire playlist or album in one shot.
+
+[![Platform](https://img.shields.io/badge/platform-Windows-blue)](#download)
+[![License](https://img.shields.io/badge/license-MIT-green)](#license)
+[![Made with](https://img.shields.io/badge/backend-FastAPI-009688)](#tech-stack)
+[![Made with](https://img.shields.io/badge/frontend-React-61DAFB)](#tech-stack)
+
+[Download](#download) · [Usage](#how-to-use) · [FAQ](#frequently-asked-questions) · [Build from Source](#running-from-source)
+
+</div>
+
+---
+
+## Table of Contents
+
+- [Download](#download)
+- [How to Use](#how-to-use)
+- [Downloads Folder](#downloads-folder)
+- [Features](#features)
+- [How It Works](#how-it-works)
+- [Frequently Asked Questions](#frequently-asked-questions)
+- [Project Architecture](#project-architecture)
+- [Running From Source](#running-from-source)
+- [Limitations](#limitations)
+- [Privacy](#privacy)
+- [Tech Stack](#tech-stack)
+- [Disclaimer](#disclaimer)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## Download
+
+1. Grab the latest Windows build from **[GitHub Releases](https://github.com/RahulRR-10/YTQuickie/releases)** — look for `YTQuickie-windows-x64.zip`.
+2. Right-click the ZIP → **Extract All**.
+3. Open the extracted folder and run `YTQuickie.exe`.
+
+No additional dependencies are needed for the Windows release — FFmpeg is bundled in.
+
+> **Seeing "Windows protected your PC"?**
+> That's Windows SmartScreen, and it shows up because the executable isn't code-signed (code-signing certificates cost money independent developers often can't justify for a free tool). If you downloaded YTQuickie from the official [Releases page](https://github.com/RahulRR-10/YTQuickie/releases), it's safe to proceed: click **More info → Run anyway**.
+
+---
+
+## How to Use
+
+### 1. Paste a link
+
+Drop a YouTube or Spotify URL into YTQuickie and click **FETCH TRACKS**. Paste a playlist or album link and YTQuickie pulls in every track at once — no need to add songs one by one.
+
+| Platform | Supported |
+|----------|-----------|
+| YouTube  | Single videos, full playlists |
+| Spotify  | Tracks, full albums, full playlists |
+
+### 2. Select your tracks
+
+YTQuickie lists everything it finds. Select individual tracks or hit **SELECT ALL**. Batches are capped at **50 tracks**.
+
+### 3. Convert
+
+Click **CONVERT MP3s**. YTQuickie finds the matching audio, downloads it, and converts it to a **192 kbps MP3** — up to **4 tracks at once**.
+
+---
+
+## Downloads Folder
+
+Files land in your Windows `Downloads` folder by default. Change this anytime from **Settings → Output Folder**.
+
+- **Single track** → saved directly as `Artist - Song.mp3`
+- **Multiple tracks** → bundled into `Playlist Name.zip`
+
+---
 
 ## Features
 
-- **Paste & rip** — paste any YouTube **video or playlist** URL, or a **Spotify track / album / playlist** (single videos are detected automatically — no zip, the MP3 is saved as-is).
-- **Spotify via YouTube** — no Spotify credentials needed: track metadata is scraped from Spotify's public embed pages, then each track is matched to its YouTube counterpart (duration + title scoring) for audio extraction.
-- **Track selector** — preview the playlist and hand-pick up to **50 tracks** (or select all).
-- **Concurrent ripping** — up to 4 tracks at once via yt-dlp, encoded to 192kbps MP3 (FFmpeg).
-- **Live progress** — SSE-streamed per-track status with retro segment-bar progress: `RIP → ENC → OK`.
-- **Auto-save** — no save dialog: results land straight in your Downloads folder (configurable under **Settings** → Download location, via folder picker or typed path).
-- **Frameless desktop shell** — pywebview window with the retro UI edge-to-edge (drag from the title bar, minimize / close buttons, resizable from 820×620).
-- **Convert again** — jump straight back to the URL input after a rip finishes.
+- **Download entire playlists and albums in one go** — not just single tracks
+- YouTube — single videos and full playlists
+- Spotify — tracks, albums, and playlists
+- Track preview with individual selection
+- Batches of up to 50 tracks, 4 processed concurrently
+- 192 kbps MP3 output
+- Automatic ZIP bundling for multi-track downloads
+- Custom output directory
+- Automatic temp-file cleanup
+- Live conversion progress
+- Retro CRT-inspired desktop interface
 
-## Tech Stack
-
-| Layer       | Tech                                                              |
-|-------------|-------------------------------------------------------------------|
-| Backend     | Python · FastAPI · yt-dlp · SSE (server-sent events) mixed |
-| Frontend    | React · Vite · Tailwind CSS                                       |
-| Desktop     | pywebview (Microsoft Edge WebView2)                               |
-
-## Screenshots
-
-<p align="center">
-  <img src="screenshots/playlist-viewer-selector.png" alt="Playlist viewer & selector" width="500"><br>
-  <img src="screenshots/conversion-encoding.png" alt="Conversion & encoding progress" width="500"><br>
-  <img src="screenshots/download-screen.png" alt="Download archive screen" width="500">
-</p>
-
-## Getting Started
-
-### Download the release (no install needed)
-
-Grab the latest **YTQuickie-windows-x64.zip** from the [Releases](https://github.com/RahulRR-10/YTQuickie/releases) page, extract it anywhere, and run `YTQuickie.exe`. FFmpeg is bundled, so no extra installs are required.
-
-> SmartScreen may warn "Windows protected your PC" because the app isn't code-signed — click **More info → Run anyway**.
-
-### Prerequisites (running from source)
-
-- [Python 3.11+](https://www.python.org/downloads/)
-- [Node.js 22+](https://nodejs.org/) (Vite 8 requires ^20.19 or >=22.12)
-- [FFmpeg](https://ffmpeg.org/) on your PATH (used for MP3 encoding)
-- Microsoft Edge WebView2 runtime (preinstalled on Windows 10/11)
-
-### Desktop app (recommended)
-
-```bash
-# 1. Build the frontend (outputs to backend/static)
-cd frontend
-npm install
-npm run build
-
-# 2. Install Python deps
-cd ../backend
-pip install -r requirements.txt
-
-# 3. Launch the desktop app
-python desktop.py
-```
-
-### Browser dev mode
-
-```bash
-# Terminal 1 — frontend dev server
-cd frontend
-npm install
-npm run dev
-
-# Terminal 2 — API backend (serves the built frontend at :8000 too)
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-```
-
-Then open `http://localhost:5173` (or `http://localhost:8000` after `npm run build`).
-
-## Usage Guide (End to End)
-
-### 1. Get the app (from GitHub Releases)
-
-1. Open **https://github.com/RahulRR-10/YTQuickie/releases** and find the latest `v*` release.
-2. Under **Assets**, click **`YTQuickie-windows-x64.zip`** to download it (~100 MB).
-3. Right-click the zip → **Extract All** (anywhere — `Desktop\YTQuickie`, Downloads, etc.).
-4. Open the extracted folder and double-click **`YTQuickie.exe`**. That's it — no FFmpeg, no Python, no install.
-
-> Microsoft Edge WebView2 is preinstalled on Windows 10/11. If SmartScreen shows "Windows protected your PC" (the app isn't code-signed), click **More info → Run anyway**.
-
-### 2. What you can paste
-
-| Source | Example URL |
-|--------|-------------|
-| YouTube video | `https://www.youtube.com/watch?v=dQw4w9WgXcQ` |
-| YouTube playlist | `https://www.youtube.com/playlist?list=...` |
-| Spotify single track | `https://open.spotify.com/track/...` |
-| Spotify album | `https://open.spotify.com/album/...` |
-| Spotify playlist | `https://open.spotify.com/playlist/...` |
-
-> **Spotify needs no account/credentials** — the app scrapes the public embed page for track metadata and maps each track to its YouTube audio.
-
-### 3. Rip a track or playlist
-
-1. Paste the URL into the input and press **`FETCH TRACKS`**. The `READY`/`BUSY`/`ERR` LEDs show what's happening.
-2. **Preview & select** — the tracks list shows `TRACK TITLE · LEN · 192k`. Tick the ones you want (max 50), or hit **`SELECT ALL`** / **`CLEAR`**. Tracks that couldn't be matched to a YouTube audio are listed as *skipped*.
-3. Press **`CONVERT MP3s (N)`** to start. Each track streams live: `RIP → ENC → OK` along a retro segment bar; you can **`[ABORT OPERATION]`** mid-run.
-
-### 4. Get your files
-
-- When the rip completes you land on the **RIPPING COMPLETE** screen (`Tracks Encoded · Skipped · Format: MPEG-1 L3`).
-- **Single video/track** → `↓ DOWNLOAD MP3` saves the `.mp3` directly.
-- **Playlist/album** → `↓ DOWNLOAD ARCHIVE (.ZIP)` saves all MP3s in one zip.
-- **Nothing needs clicking to save on the desktop app** — on completion the file is auto-copied to your download folder (default `~/Downloads`), and the screen shows `>> SAVED TO: <path>`. If a file with the same name already exists, a numbered copy (`Song (2).mp3`) is created instead of overwriting.
-- **`CONVERT AGAIN`** returns you to the URL input for the next rip.
-
-### 5. Change where files go (Settings)
-
-1. Open **`SETTINGS`** from the menu bar.
-2. Under `DIR>` type a path or click **`[BROWSE FOLDER]`** (desktop) to pick one.
-3. Press **`SAVE SETTINGS`** — you'll see `>> SETTINGS SAVED`. The choice persists in `~/.ytquickie/config.json` and applies to all future rips.
-
-Ripped files for in-progress jobs live in `~/.ytquickie/downloads` and are cleaned up 1 hour after a job finishes — but the copy saved to your download folder stays permanently.
-
-## Project Structure
-
-```
-YTQ/
-├── backend/
-│   ├── main.py          # FastAPI app: fetch, jobs, SSE stream, download, settings, static serving
-│   ├── desktop.py       # pywebview launcher: frameless window + auto-save download helper
-│   ├── static/          # Built React app (generated by `npm run build`)
-│   └── requirements.txt
-├── frontend/
-│   ├── src/App.jsx      # Retro React UI (input → preview → rip → download, settings)
-│   ├── src/index.css    # CRT/bevel styling (Tailwind)
-│   ├── vite.config.js   # Builds into ../backend/static
-│   └── package.json
-└── screenshots/         # README screenshots
-```
+---
 
 ## How It Works
 
-1. **Fetch** — `POST /api/playlist/fetch` resolves the URL. YouTube URLs go straight to yt-dlp (a video returns itself as a one-track result); Spotify URLs are scraped from `open.spotify.com/embed/...` for track `title`/`artist`/`duration`, then each track is matched against a YouTube `ytsearch` (best duration + title score wins).
-2. **Select** — the tracks render as a retro list; tick the ones you want (max 50). Tracks with no acceptable YouTube match are reported as skipped.
-3. **Rip** — `POST /api/jobs` spins up a background job that downloads/encodes tracks concurrently (4 at a time), streaming `track_update` events over SSE.
-4. **Save** — single-track jobs expose the `.mp3` directly; playlists are bundled into a `.zip`. On desktop the result is auto-copied to your configured download folder (`Settings` → Download location, default `~/Downloads`) via the pywebview JS bridge.
+For **Spotify** links:
 
-## Settings
-
-- Click **Settings** in the menu bar to view/change the **Download location** (default: your `Downloads` folder).
-- Desktop: pick a folder with `[BROWSE FOLDER]` (or type a path). Browser mode: type the path directly.
-- Persisted to `~/.ytquickie/config.json`; the folder is created if it doesn't exist.
-
-## Building a Release (Windows .exe)
-
-Releases are built automatically by GitHub Actions — push a tag and the `v*` workflow builds, zips, and attaches `YTQuickie-windows-x64.zip`:
-
-```bash
-git tag v1.0.0 && git push origin main --tags
+```text
+Spotify Link → Public Embed → Track Metadata → YouTube Search
+→ Title + Duration Matching → Best Match → Download → FFmpeg → 192 kbps MP3
 ```
 
-To build locally instead:
+For **YouTube** links, the process starts directly from the video or playlist — no matching step needed.
 
-```bash
-# 1. Build the frontend
-cd frontend && npm ci && npm run build && cd ..
+Multiple tracks are processed concurrently through a small worker pool, so a full playlist doesn't download one file at a time.
 
-# 2. Drop FFmpeg binaries in place (release/ is gitignored)
-mkdir release\ffmpeg   # copy ffmpeg.exe + ffprobe.exe here
+---
 
-# 3. Build the app (backend/YTQuickie.spec is committed)
-pip install -r backend/requirements.txt pyinstaller
-pyinstaller backend/YTQuickie.spec --noconfirm
-# → dist/YTQuickie/
+## Frequently Asked Questions
+
+<details>
+<summary><strong>Do I need a Spotify account or API key?</strong></summary><br>
+
+No. YTQuickie doesn't require Spotify login credentials or a developer account — it reads track metadata from Spotify's public embed.
+</details>
+
+<details>
+<summary><strong>Do I need a YouTube API key?</strong></summary><br>
+
+No. YTQuickie uses <code>yt-dlp</code> to search for and retrieve the matching YouTube audio.
+</details>
+
+<details>
+<summary><strong>Do I need FFmpeg installed?</strong></summary><br>
+
+Not for the Windows release — it's bundled in. If you're running from source, you'll need FFmpeg on your system <code>PATH</code>.
+</details>
+
+<details>
+<summary><strong>Why doesn't my large Spotify playlist show every track?</strong></summary><br>
+
+YTQuickie intentionally avoids requiring authenticated Spotify API access, relying instead on the public embed for metadata. That method caps out at roughly the first 100 tracks on very large playlists.
+</details>
+
+<details>
+<summary><strong>Why did it download a different version of my song?</strong></summary><br>
+
+For Spotify tracks, YTQuickie searches YouTube by title, artist, and duration, then scores the results to find the closest match. Since YouTube often hosts multiple versions of the same song — live performances, remixes, covers, music videos, mislabeled reuploads — the match isn't always guaranteed to be the original studio version.
+</details>
+
+<details>
+<summary><strong>Where are temporary files stored?</strong></summary><br>
+
+Under <code>~/.ytquickie/downloads</code>, and they're automatically cleaned up roughly an hour after conversion finishes.
+</details>
+
+---
+
+## Project Architecture
+
+```text
+YTQuickie/
+│
+├── backend/
+│   ├── main.py            # FastAPI server, metadata scraping, download jobs, SSE streams
+│   ├── desktop.py         # Desktop window and file-system bridge
+│   ├── YTQuickie.spec     # PyInstaller configuration
+│   └── requirements.txt
+│
+├── frontend/
+│   ├── src/                # React application and UI
+│   ├── vite.config.js
+│   └── package.json
+│
+└── screenshots/
 ```
 
-## Notes & Limitations
+---
 
-- Max **50 tracks** per rip (capped to keep session durations sane).
-- Private, age-restricted, or removed YouTube videos are skipped and reported on the download screen.
-- **Spotify caveats:** no API is used, so playlists longer than ~100 tracks are truncated by Spotify's embed page; matching occasionally picks a cover/live version (duration + title scoring keeps this rare); and a Spotify rip has an extra remix round-trip per track (one YouTube search each, so large playlist fetches take longer).
-- Job scratch files are kept in `~/.ytquickie/downloads` and cleaned up **1 hour** after a job completes.
-- The window itself is non-resizable-by-layout by design; it can be resized (min 820×620) with the content scrolling internally.
+## Running From Source
+
+For developers who want to modify or contribute to YTQuickie.
+
+**Requirements**
+
+- Python 3.11+
+- Node.js 22+
+- FFmpeg
+- Microsoft Edge WebView2 *(pre-installed on most Windows 10/11 systems)*
+
+**Setup**
+
+```bash
+git clone https://github.com/RahulRR-10/YTQuickie.git
+cd YTQuickie
+
+# Build the frontend
+cd frontend
+npm install
+npm run build
+cd ..
+
+# Install backend dependencies
+cd backend
+pip install -r requirements.txt
+
+# Run the app
+python desktop.py
+```
+
+**Development mode** (frontend hot-reload)
+
+```bash
+# Terminal 1 — frontend
+cd frontend
+npm run dev
+
+# Terminal 2 — backend
+cd backend
+uvicorn main:app --reload
+```
+
+---
+
+## Limitations
+
+- **50-track batch limit** — keeps consecutive YouTube search requests in check.
+- **Large Spotify playlists** — the public embed exposes roughly the first 100 tracks only.
+- **Internet required** — for both searching and downloading audio.
+- **Imperfect matching** — Spotify tracks are matched to YouTube by metadata, which works well but isn't foolproof.
+
+---
+
+## Privacy
+
+YTQuickie never asks for:
+
+- Spotify API credentials
+- YouTube API credentials
+- Spotify login credentials
+
+All downloading and audio processing happens locally on your machine — nothing is uploaded anywhere.
+
+---
+
+## Tech Stack
+
+| Component | Technology |
+|---|---|
+| Frontend | React + Vite |
+| Backend | FastAPI |
+| Desktop shell | pywebview |
+| YouTube extraction | yt-dlp |
+| Audio processing | FFmpeg |
+| Packaging | PyInstaller |
+| Progress updates | Server-Sent Events |
+
+---
+
+## Disclaimer
+
+YTQuickie is an open-source project intended for educational, archival, and personal use. Downloading or converting copyrighted material may be restricted by copyright law or by the terms of the platform hosting the content. Please respect copyright and support the artists, musicians, and creators behind the music you enjoy.
+
+---
+
+## Contributing
+
+Found a bug or have an idea?
+
+- [Open an issue](https://github.com/RahulRR-10/YTQuickie/issues)
+- Suggest a feature
+- Submit a pull request
+
+Check out the [GitHub repository](https://github.com/RahulRR-10/YTQuickie) to get started.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE) for details.
+
+<p align="center">
+<strong>YTQuickie</strong><br>
+<code>PASTE → PICK → RIP → ENC → OK</code>
+</p>
