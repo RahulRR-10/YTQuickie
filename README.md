@@ -1,8 +1,8 @@
 # YTQuickie
 
-A retro-styled YouTube **URL → MP3** ripper that runs as a frameless desktop app (pywebview/WebView2) with a FastAPI + React backend.
+A retro-styled YouTube/Spotify **URL → MP3** ripper that runs as a frameless desktop app (pywebview/WebView2) with a FastAPI + React backend.
 
-> Paste a YouTube URL (single video **or** playlist), pick your tracks, and rip them as **192kbps MP3s** with a CRT terminal vibe.
+> Paste a YouTube or Spotify URL (single track, album, or playlist), pick your tracks, and rip them as **192kbps MP3s** with a CRT terminal vibe.
 
 <p align="center">
   <img src="screenshots/main-screen-url-input.png" alt="Main screen — URL input" width="500">
@@ -10,7 +10,8 @@ A retro-styled YouTube **URL → MP3** ripper that runs as a frameless desktop a
 
 ## Features
 
-- **Paste & rip** — paste any YouTube **video or playlist** URL; single videos are detected automatically (no zip — the MP3 is saved as-is).
+- **Paste & rip** — paste any YouTube **video or playlist** URL, or a **Spotify track / album / playlist** (single videos are detected automatically — no zip, the MP3 is saved as-is).
+- **Spotify via YouTube** — no Spotify credentials needed: track metadata is scraped from Spotify's public embed pages, then each track is matched to its YouTube counterpart (duration + title scoring) for audio extraction.
 - **Track selector** — preview the playlist and hand-pick up to **50 tracks** (or select all).
 - **Concurrent ripping** — up to 4 tracks at once via yt-dlp, encoded to 192kbps MP3 (FFmpeg).
 - **Live progress** — SSE-streamed per-track status with retro segment-bar progress: `RIP → ENC → OK`.
@@ -94,8 +95,8 @@ YTQ/
 
 ## How It Works
 
-1. **Fetch** — `POST /api/playlist/fetch` resolves the URL with yt-dlp. A playlist returns its tracks; a single video (no `entries`) returns itself as a one-track result.
-2. **Select** — the tracks render as a retro list; tick the ones you want (max 50).
+1. **Fetch** — `POST /api/playlist/fetch` resolves the URL. YouTube URLs go straight to yt-dlp (a video returns itself as a one-track result); Spotify URLs are scraped from `open.spotify.com/embed/...` for track `title`/`artist`/`duration`, then each track is matched against a YouTube `ytsearch` (best duration + title score wins).
+2. **Select** — the tracks render as a retro list; tick the ones you want (max 50). Tracks with no acceptable YouTube match are reported as skipped.
 3. **Rip** — `POST /api/jobs` spins up a background job that downloads/encodes tracks concurrently (4 at a time), streaming `track_update` events over SSE.
 4. **Save** — single-track jobs expose the `.mp3` directly; playlists are bundled into a `.zip`. On desktop the result is auto-copied to your configured download folder (`Settings` → Download location, default `~/Downloads`) via the pywebview JS bridge.
 
@@ -108,6 +109,7 @@ YTQ/
 ## Notes & Limitations
 
 - Max **50 tracks** per rip (capped to keep session durations sane).
-- Private, age-restricted, or removed videos are skipped and reported on the download screen.
+- Private, age-restricted, or removed YouTube videos are skipped and reported on the download screen.
+- **Spotify caveats:** no API is used, so playlists longer than ~100 tracks are truncated by Spotify's embed page; matching occasionally picks a cover/live version (duration + title scoring keeps this rare); and a Spotify rip has an extra remix round-trip per track (one YouTube search each, so large playlist fetches take longer).
 - Job scratch files are kept in `~/.ytquickie/downloads` and cleaned up **1 hour** after a job completes.
 - The window itself is non-resizable-by-layout by design; it can be resized (min 820×620) with the content scrolling internally.

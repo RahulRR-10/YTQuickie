@@ -401,6 +401,7 @@ export default function App() {
   const failedCount = Object.values(tracksStatus).filter((t) => t.status === "failed").length;
   const doneCount = Object.values(tracksStatus).filter((t) => t.status === "done").length;
   const isSingle = selectedIds.size === 1;
+  const isSpotifyUrl = /(open\.spotify\.com|play\.spotify\.com|^spotify:)/i.test(url);
   const failedTracks = Array.from(selectedIds)
     .map((vid) => ({ vid, ...(playlist?.tracks.find((t) => t.id === vid) || {}) }))
     .filter((t) => tracksStatus[t.vid]?.status === "failed")
@@ -473,17 +474,17 @@ export default function App() {
                 <span className="text-[14px] font-bold text-led-green uppercase tracking-wider">
                   &gt;&gt; Tape-deck / URL Receiver
                 </span>
-                <span className="text-[11px] text-zinc-500">SRC: YOUTUBE</span>
+                <span className="text-[11px] text-zinc-500">SRC: {isSpotifyUrl ? "SPOTIFY" : "YOUTUBE"}</span>
               </div>
 
               <div className="bevel-in bg-black px-3 py-2">
-                <div className="text-[11px] text-zinc-500 uppercase">&gt; Paste YouTube URL below</div>
+                <div className="text-[11px] text-zinc-500 uppercase">&gt; Paste YouTube or Spotify URL below</div>
                 <form onSubmit={handleFetchPlaylist} className="flex flex-col gap-4 pt-2">
                   <div className="bevel-up bg-black px-3 py-2 flex items-center gap-2">
                     <span className="text-[12px] text-led-cyan">URL&gt;</span>
                     <input
                       type="text"
-                      placeholder="YouTube playlist or video URL"
+                      placeholder="YouTube or Spotify URL"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
                       className="flex-1 bg-transparent font-mono text-[14px] text-led-green placeholder-zinc-600 focus:outline-none caret-led-green"
@@ -531,6 +532,11 @@ export default function App() {
                   <span className="text-[11px] text-zinc-500 uppercase">&gt; Tracks ready for selection</span>
                   <Led label={`${selectedIds.size} SEL`} active={selectedIds.size > 0} color="#00e5ff" />
                 </div>
+                {playlist.skipped?.length > 0 && (
+                  <div className="text-[11px] text-led-amber uppercase tracking-wider">
+                    &gt; {playlist.skipped.length} track(s) skipped — no YouTube match found
+                  </div>
+                )}
               </div>
 
               <div className="bevel-in bg-black">

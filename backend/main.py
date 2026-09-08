@@ -1,10 +1,14 @@
 import asyncio
+import html
 import json
 import os
 import re
 import shutil
 import time
+import urllib.parse
+import urllib.request
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -264,9 +268,250 @@ async def start_cleanup_task():
     asyncio.create_task(cleanup_loop())
 
 
+# --- Spotify (no-credentials embed scraping) ---
+SPOTIFY_EMBED_URL = "https://open.spotify.com/embed/{kind}/{sid}"
+SPOTIFY_TRACK_SEARCH_LIMIT = 5
+SPOTIFY_MATCH_DURATION_TOLERANCE_S = 3.0
+SPOTIFY_MATCH_DURATION_TOLERANCE_PCT = 0.15
+SPOTIFY_MIN_SIMILARITY = 0.42
+
+_VARIANT_KEYWORD_RE = re.compile(
+    r"\b(lyrics?|lyrical|karaoke|cover|live|remix|remaster|reverb|"
+    r"slowed|sped ?up|8d|instrumental|juke ?box|megamix|unplugged)\b",
+    re.I,
+)
+
+
+def _variant_penalty(title: str) -> float:
+    return 0.10 if _VARIANT_KEYWORD_RE.search(title) else 0.0
+
+
+def parse_spotify_url(url: str) -> Optional[tuple]:
+    """Return (kind, spotify_id) or None for 'open.spotify.com/...' URLs and spotify: URIs."""
+    url = url.strip()
+    uri = re.match(r"^spotify:(track|playlist|album):([A-Za-z0-9]+)(?:$|\?)", url)
+    if uri:
+        return uri.group(1), uri.group(2)
+    m = re.search(r"(?:open|play)\.spotify\.com/(track|playlist|album)/([A-Za-z0-9]+)", url)
+    if m:
+        return m.group(1), m.group(2)
+    return None
+
+
+def _parse_next_data(html_text: str) -> Optional[dict]:
+    m = re.search(
+        r'<script[^>]*id="__NEXT_DATA__"[^>]*>(.*?)</script>', html_text, re.S
+    )
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(1))
+    except ValueError:
+        return None
+
+
+def _artists_from_subtitle(subtitle) -> str:
+    subtitle = html.unescape(str(subtitle or ""))
+    subtitle = urllib.parse.unquote_plus(subtitle.replace("%", ", "))
+    return ", ".join(
+        part.strip() for part in re.split(r"[,/|·•–]", subtitle) if part.strip()
+    )
+
+
+def _spotify_embed_entity(html_text: str) -> tuple:
+    """Return (entity dict, list of track dicts) parsed from the embed page JSON."""
+    data = _parse_next_data(html_text)
+    if data is None:
+        return None, []
+    entity, tracks = None, []
+
+    def walk(node):
+        nonlocal entity
+        if isinstance(node, dict):
+            if (
+                entity is None
+                and isinstance(node.get("type"), str)
+                and node.get("type") in ("playlist", "album", "track")
+            ):
+                entity = node
+            tl = node.get("trackList")
+            if isinstance(tl, list):
+                tracks.extend(t for t in tl if isinstance(t, dict))
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(data)
+    return entity, tracks
+
+
+def _extract_spotify_tracks(html_text: str) -> List[dict]:
+    entity, track_objs = _spotify_embed_entity(html_text)
+    if not track_objs and entity and entity.get("type") == "track":
+        track_objs = [entity]
+    items = []
+    for obj in track_objs:
+        title = (obj.get("title") or obj.get("name") or "").strip()
+        if not title:
+            continue
+        if isinstance(obj.get("artists"), list):
+            artists = ", ".join(
+                str(a.get("name", "")).strip()
+                for a in obj["artists"]
+                if isinstance(a, dict) and a.get("name")
+            )
+        else:
+            artists = _artists_from_subtitle(obj.get("subtitle"))
+        duration_ms = obj.get("duration")
+        duration = (
+            round(duration_ms / 1000) if isinstance(duration_ms, (int, float)) else None
+        )
+        items.append({"title": title, "artist": artists, "duration": duration})
+    return items
+
+
+def _spotify_playlist_title(html_text: str, kind: str, default: str) -> Optional[str]:
+    if kind == "track":
+        items = _extract_spotify_tracks(html_text)
+        if items:
+            t = items[0]
+            return f"{t['artist']} - {t['title']}" if t["artist"] else t["title"]
+        return default
+    entity, _ = _spotify_embed_entity(html_text)
+    if entity:
+        name = entity.get("name") or entity.get("title")
+        if name:
+            return html.unescape(str(name)).strip() or default
+    return default
+
+
+def _get_spotify_embed(kind: str, sid: str) -> str:
+    url = SPOTIFY_EMBED_URL.format(kind=kind, sid=sid)
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return resp.read().decode("utf-8", errors="replace")
+
+
+def _search_youtube(query: str) -> List[dict]:
+    ydl_opts = {
+        "extract_flat": True,
+        "skip_download": True,
+        "quiet": True,
+        "no_warnings": True,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(f"ytsearch{SPOTIFY_TRACK_SEARCH_LIMIT}:{query}", download=False)
+    entries = info.get("entries") or []
+    return [
+        {
+            "id": e.get("id"),
+            "title": (e.get("title") or "").strip(),
+            "duration": e.get("duration"),
+        }
+        for e in entries
+        if e and e.get("id") and e.get("title")
+    ]
+
+
+def _title_score(a: str, b: str) -> float:
+    a_tokens = set(re.findall(r"[a-z0-9]+", a.lower()))
+    b_tokens = set(re.findall(r"[a-z0-9]+", b.lower()))
+    if not a_tokens or not b_tokens:
+        return 0.0
+    return len(a_tokens & b_tokens) / len(a_tokens)
+
+
+def _pick_best_match(track: dict, query: str) -> Optional[dict]:
+    best, best_score = None, None
+    for hit in _search_youtube(query):
+        sim = _title_score(query, hit["title"])
+        hit_dur = hit.get("duration")
+        if hit_dur is None:
+            dur_diff, dur_ok = 0.0, True
+        else:
+            dur_diff = abs(hit_dur - (track["duration"] or 0))
+            dur_ok = dur_diff <= SPOTIFY_MATCH_DURATION_TOLERANCE_S or (
+                track["duration"]
+                and dur_diff <= track["duration"] * SPOTIFY_MATCH_DURATION_TOLERANCE_PCT
+            )
+        if not dur_ok:
+            continue
+        score = sim - _variant_penalty(hit["title"]) - (dur_diff / 60.0) * 0.1
+        if best_score is None or score > best_score:
+            best, best_score = hit, score
+    if best and best_score is not None and best_score >= SPOTIFY_MIN_SIMILARITY:
+        return best
+    return None
+
+
+def _resolve_spotify_track(track: dict) -> Optional[dict]:
+    title = track["title"]
+    artists = track["artist"]
+    primary = artists.split(",")[0].strip()
+    display = f"{artists} - {title}"
+
+    best = _pick_best_match(track, f"{artists} - {title} audio")
+    if best is None and artists != primary:
+        best = _pick_best_match(track, f"{primary} - {title} audio")
+
+    if best is None:
+        return None
+    return {
+        "id": best["id"],
+        "title": display,
+        "duration": track["duration"],
+        "thumbnail": None,
+        "match_title": best["title"],
+    }
+
+
+def fetch_spotify_metadata(url: str) -> dict:
+    parsed = parse_spotify_url(url)
+    if not parsed:
+        raise HTTPException(status_code=400, detail="Invalid Spotify URL.")
+
+    kind, sid = parsed
+    try:
+        html_text = _get_spotify_embed(kind, sid)
+    except Exception as e:
+        raise HTTPException(
+            status_code=400, detail=f"Could not fetch Spotify data from Spotify: {e}"
+        )
+
+    tracks = _extract_spotify_tracks(html_text)
+    if not tracks:
+        raise HTTPException(status_code=400, detail="No playable tracks found for that Spotify link.")
+
+    playlist_title = _spotify_playlist_title(html_text, kind, "Spotify")
+    tracks = tracks[:MAX_TRACKS]
+
+    results, skipped = [], []
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        for track, resolved in zip(tracks, pool.map(_resolve_spotify_track, tracks)):
+            if resolved:
+                results.append(resolved)
+            else:
+                skipped.append(f"{track['artist']} - {track['title']}")
+
+    return {
+        "playlist_title": playlist_title,
+        "total_tracks_in_playlist": len(tracks),
+        "returned_tracks": len(results),
+        "truncated": len(tracks) == MAX_TRACKS,
+        "max_tracks": MAX_TRACKS,
+        "skipped": skipped,
+        "tracks": results,
+    }
+
+
 # --- Endpoints ---
 @app.post("/api/playlist/fetch")
 def fetch_playlist_metadata(req: FetchRequest):
+    if parse_spotify_url(req.url):
+        return fetch_spotify_metadata(req.url)
+
     ydl_opts = {
         "extract_flat": "in_playlist",
         "skip_download": True,
