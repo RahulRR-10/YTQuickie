@@ -82,6 +82,43 @@ uvicorn main:app --reload --port 8000
 
 Then open `http://localhost:5173` (or `http://localhost:8000` after `npm run build`).
 
+## Usage Guide (End to End)
+
+### 1. What you can paste
+
+| Source | Example URL |
+|--------|-------------|
+| YouTube video | `https://www.youtube.com/watch?v=dQw4w9WgXcQ` |
+| YouTube playlist | `https://www.youtube.com/playlist?list=...` |
+| Spotify single track | `https://open.spotify.com/track/...` |
+| Spotify album | `https://open.spotify.com/album/...` |
+| Spotify playlist | `https://open.spotify.com/playlist/...` |
+
+> **Spotify needs no account/credentials** — the app scrapes the public embed page for track metadata and maps each track to its YouTube audio.
+
+### 2. Rip a track or playlist
+
+1. Launch `YTQuickie.exe` (or `python desktop.py`).
+2. Paste the URL into the input and press **`FETCH TRACKS`**. The `READY`/`BUSY`/`ERR` LEDs show what's happening.
+3. **Preview & select** — the tracks list shows `TRACK TITLE · LEN · 192k`. Tick the ones you want (max 50), or hit **`SELECT ALL`** / **`CLEAR`**. Tracks that couldn't be matched to a YouTube audio are listed as *skipped*.
+4. Press **`CONVERT MP3s (N)`** to start. Each track streams live: `RIP → ENC → OK` along a retro segment bar; you can **`[ABORT OPERATION]`** mid-run.
+
+### 3. Get your files
+
+- When the rip completes you land on the **RIPPING COMPLETE** screen (`Tracks Encoded · Skipped · Format: MPEG-1 L3`).
+- **Single video/track** → `↓ DOWNLOAD MP3` saves the `.mp3` directly.
+- **Playlist/album** → `↓ DOWNLOAD ARCHIVE (.ZIP)` saves all MP3s in one zip.
+- **Nothing needs clicking to save on the desktop app** — on completion the file is auto-copied to your download folder (default `~/Downloads`), and the screen shows `>> SAVED TO: <path>`. If a file with the same name already exists, a numbered copy (`Song (2).mp3`) is created instead of overwriting.
+- **`CONVERT AGAIN`** returns you to the URL input for the next rip.
+
+### 4. Change where files go (Settings)
+
+1. Open **`SETTINGS`** from the menu bar.
+2. Under `DIR>` type a path or click **`[BROWSE FOLDER]`** (desktop) to pick one.
+3. Press **`SAVE SETTINGS`** — you'll see `>> SETTINGS SAVED`. The choice persists in `~/.ytquickie/config.json` and applies to all future rips.
+
+Ripped files for in-progress jobs live in `~/.ytquickie/downloads` and are cleaned up 1 hour after a job finishes — but the copy saved to your download folder stays permanently.
+
 ## Project Structure
 
 ```
