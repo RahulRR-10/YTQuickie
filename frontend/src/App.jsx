@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
-const WINDOW_TITLE = "YTQuickie v1.0 [Audio Ripper]";
+const WINDOW_TITLE = "YTQuickie v1.3.0 [Audio Ripper]";
 
 // --- Retro UI building blocks -------------------------------------------------
 
@@ -140,6 +140,7 @@ export default function App() {
   const [jobId, setJobId] = useState(null);
   const [jobStatus, setJobStatus] = useState(null);
   const [tracksStatus, setTracksStatus] = useState({});
+  const [retrying, setRetrying] = useState(false);
   const eventSourceRef = useRef(null);
 
   // Settings State
@@ -324,6 +325,42 @@ export default function App() {
       setStep("preview");
     } else {
       setStep("input");
+    }
+  };
+
+  // 4a. Retry failed tracks within the same job (per-track retry)
+  const handleRetryTracks = async (vids) => {
+    if (!jobId || !vids || vids.length === 0 || retrying) return;
+    setRetrying(true);
+    setError(null);
+    setArchivePath(null);
+    const titleLookup = {};
+    playlist?.tracks.forEach((t) => {
+      if (vids.includes(t.id)) titleLookup[t.id] = t.title;
+    });
+    try {
+      const res = await fetch(`${API_BASE}/api/jobs/${jobId}/retry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ video_ids: vids, titles: titleLookup }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Retry failed");
+      // Optimistic reset so the UI flips back to progress immediately.
+      setTracksStatus((prev) => {
+        const next = { ...prev };
+        (data.retry_ids || vids).forEach((vid) => {
+          next[vid] = { video_id: vid, status: "pending", progress: 0 };
+        });
+        return next;
+      });
+      setJobStatus("processing");
+      setStep("processing");
+      connectSSE(jobId);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRetrying(false);
     }
   };
 
@@ -697,14 +734,36 @@ export default function App() {
               </div>
 
               {failedTracks.length > 0 && (
-                <div className="w-full bevel-in bg-black p-2.5 flex flex-col gap-1.5 text-left max-h-48 overflow-y-auto">
-                  <div className="text-[12px] font-bold text-led-red">
-                    &gt; {failedTracks.length} TRACK(S) FAILED:
+                <div className="w-full bevel-in bg-black p-2.5 flex flex-col gap-1.5 text-left max-h-64 overflow-y-auto">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-[12px] font-bold text-led-red">
+                      &gt; {failedTracks.length} TRACK(S) FAILED:
+                    </div>
+                    <RetroButton
+                      tone="primary"
+                      onClick={() => handleRetryTracks(failedTracks.map((t) => t.vid))}
+                      disabled={retrying}
+                    >
+                      {retrying ? "RETRYING..." : `[RETRY ALL ${failedTracks.length}]`}
+                    </RetroButton>
+                  </div>
+                  <div className="text-[11px] text-zinc-500 uppercase">
+                    &gt; Tip: close your browser (it locks cookies), then retry.
                   </div>
                   {failedTracks.map((t) => (
-                    <div key={t.vid} className="flex flex-col font-mono text-[12px] border-t border-zinc-900 pt-1.5">
-                      <span className="text-zinc-300 truncate">{t.title || t.vid}</span>
-                      <span className="text-led-red">&gt; {t.error || "UNKNOWN ERROR"}</span>
+                    <div key={t.vid} className="flex items-center gap-2 font-mono text-[12px] border-t border-zinc-900 pt-1.5">
+                      <div className="flex-1 min-w-0 flex flex-col">
+                        <span className="text-zinc-300 truncate">{t.title || t.vid}</span>
+                        <span className="text-led-red break-words">&gt; {t.error || "UNKNOWN ERROR"}</span>
+                      </div>
+                      <RetroButton
+                        tone="amber"
+                        className="shrink-0"
+                        onClick={() => handleRetryTracks([t.vid])}
+                        disabled={retrying}
+                      >
+                        {retrying ? "..." : "[RETRY]"}
+                      </RetroButton>
                     </div>
                   ))}
                 </div>
@@ -795,7 +854,7 @@ export default function App() {
             />
             <span className="truncate">&gt;&gt; {statusLine}</span>
           </span>
-          <span className="hidden sm:inline whitespace-nowrap">YTQ v1.0 · 192KBPS</span>
+          <span className="hidden sm:inline whitespace-nowrap">YTQ v1.3.0 · 192KBPS</span>
         </div>
       </div>
     </div>

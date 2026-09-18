@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 import yt_dlp
+from yt_dlp.cookies import extract_cookies_from_browser
 
 app = FastAPI(title="Playlist Downloader MVP")
 
@@ -98,6 +99,11 @@ class StartJobRequest(BaseModel):
     titles: Optional[Dict[str, str]] = None  # video_id -> title, for nice filenames
 
 
+class RetryRequest(BaseModel):
+    video_ids: Optional[List[str]] = None  # default: all failed tracks
+    titles: Optional[Dict[str, str]] = None
+
+
 # --- Helpers ---
 def sanitize_filename(name: str, fallback: str) -> str:
     if not name:
@@ -115,16 +121,49 @@ def clean_ytdl_error(message: str) -> str:
     """Strip ANSI codes and reduce yt-dlp errors to a short friendly reason."""
     message = ANSI_ESCAPE_RE.sub("", message or "").strip()
     lower = message.lower()
+    if "sign in to confirm" in lower or "you're not a bot" in lower:
+        return (
+            "YouTube blocked this download (bot check). "
+            "Close your browser (it locks cookies), then use RETRY. "
+            "If it persists, sign in to YouTube in Firefox, close Firefox, and retry."
+        )
     if "video is private" in lower:
         return "This video is private and cannot be downloaded."
     if "sign in to confirm your age" in lower or "age-restricted" in lower:
         return "Age-restricted — requires a logged-in account."
+    if "requested format is not available" in lower or "only images are available" in lower:
+        return (
+            "No downloadable audio found (YouTube returned images only — "
+            "signature check failed). Close your browser and hit RETRY; "
+            "the app retries automatically without cookies and with opus/m4a fallback."
+        )
+    if "signature" in lower and "fail" in lower:
+        return (
+            "YouTube signature check failed (missing JS solver). "
+            "Close your browser and hit RETRY."
+        )
     if "video is unavailable" in lower or "error code 152" in lower:
         return "This video is unavailable (removed, region-blocked, or age-gated)."
     if "not available" in lower:
         return "This video is not available."
     collapsed = re.sub(r"\s+", " ", message)
-    return collapsed[:200] or "Download failed."
+    return collapsed[:280] or "Download failed."
+
+
+def _should_retry_without_cookies(message: str) -> bool:
+    """Signature/bot failures are often caused by a locked or stale cookie jar."""
+    lower = (message or "").lower()
+    markers = (
+        "requested format is not available",
+        "only images are available",
+        "signature",
+        "n challenge",
+        "sign in to confirm",
+        "you're not a bot",
+        "cookies",
+        "dpapi",
+    )
+    return any(m in lower for m in markers)
 
 
 async def publish_event(job_id: str, payload: dict):
@@ -140,6 +179,114 @@ async def publish_event(job_id: str, payload: dict):
 
 
 # --- Core Worker Logic ---
+# Order matters: Firefox first (no DPAPI issues on Windows), then Chromium-based.
+COOKIE_BROWSERS = ("firefox", "chrome", "edge", "brave", "opera", "chromium")
+_cookies_cache: dict = {"at": 0.0, "browser": None, "found": False}
+_COOKIE_CACHE_TTL_SECONDS = 10 * 60
+
+
+def resolve_cookies_browser() -> Optional[tuple]:
+    """Return the first installed browser whose cookie store is readable, or None."""
+    now = time.time()
+    # Only cache successful lookups; retry on failure.
+    if _cookies_cache["found"] and now - _cookies_cache["at"] < _COOKIE_CACHE_TTL_SECONDS:
+        return _cookies_cache["browser"]
+
+    for name in COOKIE_BROWSERS:
+        try:
+            jar = extract_cookies_from_browser(name)
+        except Exception:
+            continue
+        if jar:
+            count = sum(1 for _ in jar) if hasattr(jar, "__iter__") else None
+            if count:
+                _cookies_cache.update(at=now, browser=(name,), found=True)
+                return (name,)
+
+    return None
+
+
+def _bundled_nodejs_dir() -> Optional[str]:
+    """Directory holding a bundled node binary (PyInstaller bundle or repo checkout)."""
+    candidates = []
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", "")
+        if meipass:
+            candidates.append(os.path.join(meipass, "nodejs"))
+    if os.environ.get("YTQ_NODE_DIR"):
+        candidates.append(os.environ["YTQ_NODE_DIR"])
+    repo_node = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "release", "nodejs"
+    )
+    candidates.append(repo_node)
+    for d in candidates:
+        if d and os.path.isdir(d):
+            return d
+    return None
+
+
+def _find_node_binary() -> Optional[str]:
+    """Find node.js binary: explicit env override, bundled copy, PATH, common locations."""
+    import shutil
+    # Explicit override wins (file or directory).
+    env_node = os.environ.get("YTQ_NODE")
+    if env_node:
+        if os.path.isfile(env_node):
+            return env_node
+        candidate = os.path.join(env_node, "node.exe" if os.name == "nt" else "node")
+        if os.path.isfile(candidate):
+            return candidate
+    # Bundled copy shipped with the frozen app / release/nodejs.
+    bundled_dir = _bundled_nodejs_dir()
+    if bundled_dir:
+        candidate = os.path.join(
+            bundled_dir, "node.exe" if os.name == "nt" else "node"
+        )
+        if os.path.isfile(candidate):
+            return candidate
+    node = shutil.which("node")
+    if node:
+        return node
+    # Common Windows install paths
+    for candidate in [
+        os.path.join(os.environ.get("ProgramFiles", ""), "nodejs", "node.exe"),
+        os.path.join(os.environ.get("ProgramFiles(x86)", ""), "nodejs", "node.exe"),
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "nodejs", "node.exe"),
+    ]:
+        if candidate and os.path.isfile(candidate):
+            return candidate
+    return None
+
+
+def _js_runtime_opts() -> dict:
+    """yt-dlp options enabling YouTube's JS-challenge solver via Node.
+
+    Without this, signature/n-challenge solving fails and YouTube returns
+    only storyboards/images -> 'Requested format is not available'.
+    """
+    node = _find_node_binary()
+    if node:
+        js_runtimes = {"node": {"path": node}}
+    else:
+        # Let yt-dlp auto-detect (deno/node on PATH); better than disabling EJS.
+        js_runtimes = {"node": {}, "deno": {}}
+    return {
+        "js_runtimes": js_runtimes,
+        # Fetch the challenge-solver script from GitHub when required.
+        "remote_components": ["ejs:github"],
+    }
+
+
+def base_ydl_opts(use_cookies: bool = True) -> dict:
+    """Shared yt-dlp options: quiet logging + autodetected browser cookies + JS runtime."""
+    opts: dict = {"quiet": True, "no_warnings": True, **_js_runtime_opts()}
+    if use_cookies:
+        browser = resolve_cookies_browser()
+        if browser:
+            opts["cookiesfrombrowser"] = browser
+    return opts
+
+
 def _ffmpeg_location():
     candidates = []
     if getattr(sys, "frozen", False):
@@ -158,9 +305,20 @@ def _ffmpeg_location():
     return None
 
 
-def run_ytdl_download(video_id: str, output_path: str, progress_cb):
-    ydl_opts = {
-        "format": "bestaudio/best",
+def _build_download_opts(
+    output_path: str, progress_cb, use_cookies: bool, fmt: str
+) -> dict:
+    """Build download opts. Tolerant format (any audio incl. opus) -> MP3/192.
+
+    NOTE: no `extractor_args.player_client` override — yt-dlp's upstream
+    defaults track YouTube's SABR experiments. Pinning `android` breaks
+    downloads when YouTube serves SABR-only streams.
+    """
+    return {
+        **base_ydl_opts(use_cookies=use_cookies),
+        "format": fmt,
+        "format_sort": ["acodec:opus", "acodec:aac", "acodec:mp3"],
+        "prefer_free_formats": False,
         "outtmpl": output_path,
         "ffmpeg_location": _ffmpeg_location(),
         "postprocessors": [
@@ -175,15 +333,51 @@ def run_ytdl_download(video_id: str, output_path: str, progress_cb):
         "progress_hooks": [progress_cb],
         "retries": 3,
         "fragment_retries": 3,
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["android", "web"],
-                "player_skip": ["configs", "webpage"],
-            }
-        },
+        "socket_timeout": 30,
     }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
+
+
+def run_ytdl_download(video_id: str, output_path: str, progress_cb):
+    """Download+transcode with automatic fallbacks.
+
+    Attempt order (first success wins):
+      1. bestaudio/best WITH cookies (authenticated, best quality)
+      2. bestaudio/best WITHOUT cookies (cookie jar locked/stale/bot-flagged)
+      3. best (any audio+video) WITHOUT cookies (last resort, still -> MP3)
+    """
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    attempts = [
+        {"use_cookies": True, "fmt": "bestaudio/best"},
+        {"use_cookies": False, "fmt": "bestaudio/best"},
+        {"use_cookies": False, "fmt": "best"},
+    ]
+    last_exc: Optional[Exception] = None
+    for i, attempt in enumerate(attempts):
+        ydl_opts = _build_download_opts(
+            output_path, progress_cb, attempt["use_cookies"], attempt["fmt"]
+        )
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+            return
+        except Exception as e:
+            last_exc = e
+            msg = str(e)
+            # Only fall through to the no-cookie fallbacks for cookie/signature/
+            # format-availability failures; re-raise hard failures immediately,
+            # except allow format fallback (attempt 3) for format errors.
+            is_last = i == len(attempts) - 1
+            if is_last:
+                break
+            next_uses_cookies = attempts[i + 1]["use_cookies"]
+            if next_uses_cookies != attempt["use_cookies"]:
+                # Transitioning cookies -> no cookies: only worth it for
+                # signature/bot/format failures.
+                if not _should_retry_without_cookies(msg):
+                    break
+            continue
+    assert last_exc is not None
+    raise last_exc
 
 
 async def process_video(job_id: str, video_id: str, job_dir: str, title: Optional[str]):
@@ -194,6 +388,7 @@ async def process_video(job_id: str, video_id: str, job_dir: str, title: Optiona
         track = jobs[job_id]["tracks"][video_id]
         track["status"] = "downloading"
         track["progress"] = 0
+        track.pop("error", None)
         await publish_event(job_id, {"type": "track_update", "track": track})
 
         safe_title = sanitize_filename(title or video_id, video_id)
@@ -249,11 +444,37 @@ async def process_video(job_id: str, video_id: str, job_dir: str, title: Optiona
         await publish_event(job_id, {"type": "track_update", "track": track})
 
 
+async def _finalize_job(job_id: str, all_ids: List[str]):
+    """Recompute result_path (single MP3 or ZIP) and mark completed."""
+    if len(all_ids) == 1:
+        result_path = jobs[job_id]["tracks"][all_ids[0]].get("file_path")
+    else:
+        job_dir = os.path.join(BASE_DOWNLOAD_DIR, job_id)
+        zip_base = os.path.join(BASE_DOWNLOAD_DIR, f"{job_id}_archive")
+        # Drop a stale archive so make_archive rebuilds from current job_dir.
+        stale = zip_base + ".zip"
+        if os.path.exists(stale):
+            try:
+                os.remove(stale)
+            except OSError:
+                pass
+        loop = asyncio.get_running_loop()
+        result_path = await loop.run_in_executor(
+            None, shutil.make_archive, zip_base, "zip", job_dir
+        )
+
+    jobs[job_id]["result_path"] = result_path
+    jobs[job_id]["status"] = "completed"
+    jobs[job_id]["completed_at"] = time.time()
+    await publish_event(job_id, {"type": "job_status", "status": "completed"})
+
+
 async def run_job(job_id: str, selected_ids: List[str], titles: Dict[str, str]):
     job_dir = os.path.join(BASE_DOWNLOAD_DIR, job_id)
     os.makedirs(job_dir, exist_ok=True)
 
     jobs[job_id]["status"] = "processing"
+    jobs[job_id]["completed_at"] = None
     await publish_event(job_id, {"type": "job_status", "status": "processing"})
 
     tasks = [
@@ -268,19 +489,32 @@ async def run_job(job_id: str, selected_ids: List[str], titles: Dict[str, str]):
         shutil.rmtree(job_dir, ignore_errors=True)
         return
 
-    if len(selected_ids) == 1:
-        result_path = jobs[job_id]["tracks"][selected_ids[0]].get("file_path")
-    else:
-        zip_base = os.path.join(BASE_DOWNLOAD_DIR, f"{job_id}_archive")
-        loop = asyncio.get_running_loop()
-        result_path = await loop.run_in_executor(
-            None, shutil.make_archive, zip_base, "zip", job_dir
-        )
+    await _finalize_job(job_id, selected_ids)
 
-    jobs[job_id]["result_path"] = result_path
-    jobs[job_id]["status"] = "completed"
-    jobs[job_id]["completed_at"] = time.time()
-    await publish_event(job_id, {"type": "job_status", "status": "completed"})
+
+async def run_retry_job(job_id: str, retry_ids: List[str]):
+    """Re-process only failed tracks, then rebuild the archive."""
+    job = jobs.get(job_id)
+    if not job:
+        return
+    job_dir = os.path.join(BASE_DOWNLOAD_DIR, job_id)
+    os.makedirs(job_dir, exist_ok=True)
+
+    job["status"] = "processing"
+    job["completed_at"] = None
+    job_cancel_flags[job_id] = False
+    await publish_event(job_id, {"type": "job_status", "status": "processing"})
+
+    titles = job.get("titles") or {}
+    tasks = [process_video(job_id, vid, job_dir, titles.get(vid)) for vid in retry_ids]
+    await asyncio.gather(*tasks)
+
+    if job_cancel_flags.get(job_id):
+        job["status"] = "cancelled"
+        await publish_event(job_id, {"type": "job_status", "status": "cancelled"})
+        return
+
+    await _finalize_job(job_id, job.get("selected_ids") or list(job["tracks"].keys()))
 
 
 async def cleanup_loop():
@@ -434,10 +668,9 @@ def _get_spotify_embed(kind: str, sid: str) -> str:
 
 def _search_youtube(query: str) -> List[dict]:
     ydl_opts = {
+        **base_ydl_opts(),
         "extract_flat": True,
         "skip_download": True,
-        "quiet": True,
-        "no_warnings": True,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(f"ytsearch{SPOTIFY_TRACK_SEARCH_LIMIT}:{query}", download=False)
@@ -549,9 +782,9 @@ def fetch_playlist_metadata(req: FetchRequest):
         return fetch_spotify_metadata(req.url)
 
     ydl_opts = {
+        **base_ydl_opts(),
         "extract_flat": "in_playlist",
         "skip_download": True,
-        "quiet": True,
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -639,6 +872,8 @@ def create_job(req: StartJobRequest, bg_tasks: BackgroundTasks):
             vid: {"video_id": vid, "status": "pending", "progress": 0}
             for vid in req.video_ids
         },
+        "titles": dict(req.titles or {}),
+        "selected_ids": list(req.video_ids),
         "result_path": None,
         "completed_at": None,
     }
@@ -647,6 +882,36 @@ def create_job(req: StartJobRequest, bg_tasks: BackgroundTasks):
 
     bg_tasks.add_task(run_job, job_id, req.video_ids, req.titles or {})
     return {"job_id": job_id}
+
+
+@app.post("/api/jobs/{job_id}/retry")
+def retry_failed_tracks(job_id: str, req: RetryRequest, bg_tasks: BackgroundTasks):
+    """Re-queue failed tracks within the same job (per-track retry)."""
+    job = jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.get("status") == "processing":
+        raise HTTPException(status_code=409, detail="Job is still processing.")
+
+    if req.titles:
+        job.setdefault("titles", {}).update(req.titles)
+
+    if req.video_ids:
+        retry_ids = [vid for vid in req.video_ids if vid in job["tracks"]]
+    else:
+        retry_ids = [
+            vid for vid, t in job["tracks"].items() if t.get("status") == "failed"
+        ]
+    if not retry_ids:
+        raise HTTPException(status_code=400, detail="No failed tracks to retry.")
+
+    # Reset and re-run only those tracks; archive is rebuilt on completion.
+    for vid in retry_ids:
+        job["tracks"][vid].update({"status": "pending", "progress": 0})
+        job["tracks"][vid].pop("error", None)
+
+    bg_tasks.add_task(run_retry_job, job_id, retry_ids)
+    return {"job_id": job_id, "retry_ids": retry_ids}
 
 
 @app.get("/api/jobs/{job_id}")

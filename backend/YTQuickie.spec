@@ -14,6 +14,14 @@ datas = [
     (os.path.join(ROOT, "release", "ffmpeg"), "ffmpeg"),
 ]
 
+# Bundled Node.js runtime for YouTube's JS-challenge solver (yt-dlp EJS).
+# Drop a portable node.exe (e.g. from https://nodejs.org win-x64 zip) into
+# release/nodejs/ before running PyInstaller; it is picked up automatically
+# by backend/main.py `_find_node_binary()` via sys._MEIPASS/nodejs.
+_NODEJS_SRC = os.path.join(ROOT, "release", "nodejs")
+if os.path.isdir(_NODEJS_SRC):
+    datas.append((_NODEJS_SRC, "nodejs"))
+
 hiddenimports = [
     "webview.platforms.winforms",
     "clr",

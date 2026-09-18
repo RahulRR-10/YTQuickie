@@ -84,6 +84,7 @@ Files land in your Windows `Downloads` folder by default. Change this anytime fr
 - Spotify — tracks, albums, and playlists
 - Track preview with individual selection
 - Unlimited batch size, 4 processed concurrently
+- Per-track retry for failed downloads (retry one track or all failed at once)
 - 192 kbps MP3 output
 - Automatic ZIP bundling for multi-track downloads
 - Custom output directory
@@ -138,6 +139,12 @@ YTQuickie intentionally avoids requiring authenticated Spotify API access, relyi
 <summary><strong>Why did it download a different version of my song?</strong></summary><br>
 
 For Spotify tracks, YTQuickie searches YouTube by title, artist, and duration, then scores the results to find the closest match. Since YouTube often hosts multiple versions of the same song — live performances, remixes, covers, music videos, mislabeled reuploads — the match isn't always guaranteed to be the original studio version.
+</details>
+
+<details>
+<summary><strong>All tracks fail with "No downloadable audio found" / "Requested format is not available"?</strong></summary><br>
+
+YouTube sometimes returns no playable audio when the app's browser cookies are stale, or when your browser is open (it locks the cookie store). Close your browser completely, then hit **RETRY** on the failed track or **RETRY ALL** on the results screen — the app automatically retries without cookies and falls back across audio formats (opus/m4a). The Windows release bundles the Node.js solver these downloads require, so no extra setup is needed.
 </details>
 
 <details>

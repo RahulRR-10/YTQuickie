@@ -53,6 +53,15 @@ jobs:
           Copy-Item (Join-Path $ffmpeg.DirectoryName "ffprobe.exe") "release\ffmpeg\ffprobe.exe"
           Get-ChildItem release\ffmpeg | Select-Object Name, Length
 
+      - name: Bundle Node.js runtime (YouTube JS-challenge solver)
+        shell: pwsh
+        run: |
+          $node = (Get-Command node).Source
+          Write-Host "Bundling Node from $node"
+          New-Item -ItemType Directory -Force -Path "release\nodejs" | Out-Null
+          Copy-Item $node "release\nodejs\node.exe"
+          Get-ChildItem release\nodejs | Select-Object Name, Length
+
       - name: Build with PyInstaller
         run: pyinstaller backend\YTQuickie.spec --noconfirm
 
