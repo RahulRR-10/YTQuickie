@@ -21,7 +21,7 @@ from main import app, jobs, get_configured_download_dir
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8756
-WINDOW_TITLE = "YTQuickie v1.3.1 [Audio Ripper]"
+WINDOW_TITLE = "YTQuickie v1.3.2 [Audio Ripper]"
 WINDOW_WIDTH = 820
 WINDOW_HEIGHT = 620
 

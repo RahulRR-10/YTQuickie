@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
-const WINDOW_TITLE = "YTQuickie v1.3.1 [Audio Ripper]";
+const WINDOW_TITLE = "YTQuickie v1.3.2 [Audio Ripper]";
 
 // --- Retro UI building blocks -------------------------------------------------
 
@@ -854,7 +854,7 @@ export default function App() {
             />
             <span className="truncate">&gt;&gt; {statusLine}</span>
           </span>
-          <span className="hidden sm:inline whitespace-nowrap">YTQ v1.3.1 · 192KBPS</span>
+          <span className="hidden sm:inline whitespace-nowrap">YTQ v1.3.2 · 192KBPS</span>
         </div>
       </div>
     </div>

@@ -20,6 +20,7 @@ Paste a link, pick your tracks, and get clean 192 kbps MP3s — no Python, no No
 
 - [Download](#download)
 - [How to Use](#how-to-use)
+- [Screenshots](#screenshots)
 - [Downloads Folder](#downloads-folder)
 - [Features](#features)
 - [How It Works](#how-it-works)
@@ -64,7 +65,27 @@ YTQuickie lists everything it finds. Select individual tracks or hit **SELECT AL
 
 ### 3. Convert
 
-Click **CONVERT MP3s**. YTQuickie finds the matching audio, downloads it, and converts it to a **192 kbps MP3** — up to **4 tracks at once**.
+Click **CONVERT MP3s**. YTQuickie finds the matching audio, downloads it, and converts it to a **192 kbps MP3** — up to **4 tracks at once**. If a track fails, hit **RETRY** on that track or **RETRY ALL** — no need to start over.
+
+---
+
+## Screenshots
+
+**Paste a link and fetch tracks**
+
+![URL receiver screen](screenshots/main-screen-url-input.png)
+
+**Preview and select tracks**
+
+![Track selector screen](screenshots/playlist-viewer-selector.png)
+
+**Live rip and encode progress**
+
+![Conversion progress screen](screenshots/conversion-encoding.png)
+
+**Completed archive, ready to download**
+
+![Download screen](screenshots/download-screen.png)
 
 ---
 
