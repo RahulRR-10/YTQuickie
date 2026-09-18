@@ -48,7 +48,23 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        # Stdlib dead weight (never imported by the app or its deps).
+        "tkinter",
+        "unittest",
+        "pydoc",
+        "doctest",
+        "test",
+        # Non-Windows desktop shells (frozen app targets winforms only).
+        "webview.platforms.gtk",
+        "webview.platforms.qt",
+        "webview.platforms.cocoa",
+        "PyQt5",
+        "PyQt6",
+        "PySide2",
+        "PySide6",
+        "gi",
+    ],
     noarchive=False,
     optimize=0,
 )
@@ -64,7 +80,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=False,
+    upx=True,
     console=False,
 )
 
@@ -73,6 +89,14 @@ coll = COLLECT(
     a.binaries,
     a.datas,
     strip=False,
-    upx=False,
+    upx=True,
+    upx_exclude=[
+        # Already-compressed or signature-sensitive binaries: packing them
+        # saves nothing and can trip antivirus heuristics.
+        "*.dll",
+        "python*.dll",
+        "pywin32*",
+        "win32*",
+    ],
     name="YTQuickie",
 )

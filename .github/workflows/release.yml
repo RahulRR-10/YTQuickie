@@ -41,7 +41,7 @@ jobs:
           pip install -r backend/requirements.txt
           pip install pyinstaller
 
-      - name: Download FFmpeg
+      - name: Download FFmpeg (ffmpeg.exe only — ffprobe is unused)
         shell: pwsh
         run: |
           $zip = "$env:RUNNER_TEMP\ffmpeg.zip"
@@ -50,7 +50,6 @@ jobs:
           $ffmpeg = Get-ChildItem "$env:RUNNER_TEMP\ffmpeg" -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
           New-Item -ItemType Directory -Force -Path "release\ffmpeg" | Out-Null
           Copy-Item (Join-Path $ffmpeg.DirectoryName "ffmpeg.exe") "release\ffmpeg\ffmpeg.exe"
-          Copy-Item (Join-Path $ffmpeg.DirectoryName "ffprobe.exe") "release\ffmpeg\ffprobe.exe"
           Get-ChildItem release\ffmpeg | Select-Object Name, Length
 
       - name: Bundle Node.js runtime (YouTube JS-challenge solver)
@@ -61,6 +60,17 @@ jobs:
           New-Item -ItemType Directory -Force -Path "release\nodejs" | Out-Null
           Copy-Item $node "release\nodejs\node.exe"
           Get-ChildItem release\nodejs | Select-Object Name, Length
+
+      - name: Compress bundled binaries with UPX
+        shell: pwsh
+        run: |
+          choco install upx -y --no-progress
+          $upx = (Get-Command upx).Source
+          Write-Host "UPX at $upx"
+          # UPX only packs binaries listed here; PyInstaller's upx flag does
+          # not touch datas, so the staged ffmpeg/node exes are packed directly.
+          & $upx --best --lzma "release\ffmpeg\ffmpeg.exe" "release\nodejs\node.exe"
+          Get-ChildItem release\ffmpeg, release\nodejs | Select-Object Name, Length
 
       - name: Build with PyInstaller
         run: pyinstaller backend\YTQuickie.spec --noconfirm
