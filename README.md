@@ -60,7 +60,7 @@ Drop a YouTube or Spotify URL into YTQuickie and click **FETCH TRACKS**. Paste a
 
 ### 2. Select your tracks
 
-YTQuickie lists everything it finds. Select individual tracks or hit **SELECT ALL**. Batches are capped at **50 tracks**.
+YTQuickie lists everything it finds. Select individual tracks or hit **SELECT ALL**. Batches are unlimited.
 
 ### 3. Convert
 
@@ -83,7 +83,7 @@ Files land in your Windows `Downloads` folder by default. Change this anytime fr
 - YouTube — single videos and full playlists
 - Spotify — tracks, albums, and playlists
 - Track preview with individual selection
-- Batches of up to 50 tracks, 4 processed concurrently
+- Unlimited batch size, 4 processed concurrently
 - 192 kbps MP3 output
 - Automatic ZIP bundling for multi-track downloads
 - Custom output directory
@@ -216,7 +216,6 @@ uvicorn main:app --reload
 
 ## Limitations
 
-- **50-track batch limit** — keeps consecutive YouTube search requests in check.
 - **Large Spotify playlists** — the public embed exposes roughly the first 100 tracks only.
 - **Internet required** — for both searching and downloading audio.
 - **Imperfect matching** — Spotify tracks are matched to YouTube by metadata, which works well but isn't foolproof.

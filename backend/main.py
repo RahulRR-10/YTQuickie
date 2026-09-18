@@ -31,6 +31,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def add_no_cache_header(request, call_next):
+    response = await call_next(request)
+    if request.url.path in ("/", "/index.html") or request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 BASE_DOWNLOAD_DIR = os.path.join(
     os.environ.get("YTQ_DOWNLOAD_DIR") or str(Path.home() / ".ytquickie" / "downloads")
 )
@@ -65,7 +75,6 @@ def get_configured_download_dir() -> str:
 CONCURRENCY_LIMIT = 4
 semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
 
-MAX_TRACKS = 50
 JOB_TTL_SECONDS = 60 * 60  # delete job files/state 1 hour after completion
 CLEANUP_INTERVAL_SECONDS = 15 * 60
 
@@ -132,10 +141,20 @@ async def publish_event(job_id: str, payload: dict):
 
 # --- Core Worker Logic ---
 def _ffmpeg_location():
+    candidates = []
     if getattr(sys, "frozen", False):
         bundled = os.path.join(getattr(sys, "_MEIPASS", ""), "ffmpeg")
-        if os.path.isdir(bundled):
-            return bundled
+        candidates.append(bundled)
+    if os.environ.get("YTQ_FFMPEG_DIR"):
+        candidates.append(os.environ["YTQ_FFMPEG_DIR"])
+    repo_ffmpeg = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "release", "ffmpeg"
+    )
+    candidates.append(repo_ffmpeg)
+    for path in candidates:
+        ffmpeg = os.path.join(path, "ffmpeg.exe" if os.name == "nt" else "ffmpeg")
+        if os.path.isfile(ffmpeg):
+            return path
     return None
 
 
@@ -184,6 +203,8 @@ async def process_video(job_id: str, video_id: str, job_dir: str, title: Optiona
         loop = asyncio.get_running_loop()
 
         def progress_cb(d):
+            if job_cancel_flags.get(job_id):
+                raise yt_dlp.utils.DownloadCancelled("Cancelled by user")
             if d.get("status") == "downloading":
                 total = d.get("total_bytes") or d.get("total_bytes_estimate")
                 downloaded = d.get("downloaded_bytes", 0)
@@ -203,6 +224,10 @@ async def process_video(job_id: str, video_id: str, job_dir: str, title: Optiona
                 None, run_ytdl_download, video_id, output_tmpl, progress_cb
             )
 
+            if job_cancel_flags.get(job_id):
+                track["status"] = "cancelled"
+                return
+
             if os.path.exists(raw_path) and raw_path != final_mp3_path:
                 # Avoid collisions if two videos sanitize to the same title
                 if os.path.exists(final_mp3_path):
@@ -215,6 +240,9 @@ async def process_video(job_id: str, video_id: str, job_dir: str, title: Optiona
             track["progress"] = 100
             track["file_path"] = final_mp3_path
         except Exception as e:
+            if job_cancel_flags.get(job_id):
+                track["status"] = "cancelled"
+                return
             track["status"] = "failed"
             track["error"] = clean_ytdl_error(str(e))
 
@@ -495,7 +523,6 @@ def fetch_spotify_metadata(url: str) -> dict:
         raise HTTPException(status_code=400, detail="No playable tracks found for that Spotify link.")
 
     playlist_title = _spotify_playlist_title(html_text, kind, "Spotify")
-    tracks = tracks[:MAX_TRACKS]
 
     results, skipped = [], []
     with ThreadPoolExecutor(max_workers=4) as pool:
@@ -509,8 +536,7 @@ def fetch_spotify_metadata(url: str) -> dict:
         "playlist_title": playlist_title,
         "total_tracks_in_playlist": len(tracks),
         "returned_tracks": len(results),
-        "truncated": len(tracks) == MAX_TRACKS,
-        "max_tracks": MAX_TRACKS,
+        "truncated": False,
         "skipped": skipped,
         "tracks": results,
     }
@@ -549,7 +575,6 @@ def fetch_playlist_metadata(req: FetchRequest):
                     "total_tracks_in_playlist": 1,
                     "returned_tracks": 1,
                     "truncated": False,
-                    "max_tracks": MAX_TRACKS,
                     "tracks": [
                         {
                             "id": video_id,
@@ -578,9 +603,6 @@ def fetch_playlist_metadata(req: FetchRequest):
                 ):
                     continue
 
-                if len(items) >= MAX_TRACKS:
-                    break
-
                 items.append(
                     {
                         "id": entry.get("id"),
@@ -592,14 +614,11 @@ def fetch_playlist_metadata(req: FetchRequest):
                     }
                 )
 
-            truncated = len(entries) > MAX_TRACKS
-
             return {
                 "playlist_title": info.get("title", "Untitled Playlist"),
                 "total_tracks_in_playlist": len(entries),
                 "returned_tracks": len(items),
-                "truncated": truncated,
-                "max_tracks": MAX_TRACKS,
+                "truncated": False,
                 "tracks": items,
             }
     except HTTPException:
@@ -612,8 +631,6 @@ def fetch_playlist_metadata(req: FetchRequest):
 def create_job(req: StartJobRequest, bg_tasks: BackgroundTasks):
     if not req.video_ids:
         raise HTTPException(status_code=400, detail="No video IDs selected.")
-    if len(req.video_ids) > MAX_TRACKS:
-        raise HTTPException(status_code=400, detail=f"Max {MAX_TRACKS} tracks per job.")
 
     job_id = str(uuid.uuid4())
     jobs[job_id] = {
@@ -708,9 +725,10 @@ async def cancel_job(job_id: str):
         job_cancel_flags.pop(job_id, None)
         return {"status": "deleted"}
 
-    job["status"] = "cancelling"
-    await publish_event(job_id, {"type": "job_status", "status": "cancelling"})
-    return {"status": "cancelling"}
+    job["status"] = "cancelled"
+    shutil.rmtree(job_dir, ignore_errors=True)
+    await publish_event(job_id, {"type": "job_status", "status": "cancelled"})
+    return {"status": "cancelled"}
 
 
 @app.get("/api/settings")

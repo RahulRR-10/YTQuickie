@@ -138,7 +138,7 @@ def main() -> None:
         js_api=JsApi(),
     )
 
-    webview.start(debug=args.debug, private_mode=False)
+    webview.start(debug=args.debug, private_mode=True)
 
     # Window closed -> shut down the server.
     server.should_exit = True

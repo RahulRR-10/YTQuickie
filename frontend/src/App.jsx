@@ -227,6 +227,8 @@ export default function App() {
 
     setLoading(true);
     setError(null);
+    setJobStatus("queued");
+    setTracksStatus({});
 
     const titleLookup = {};
     playlist.tracks.forEach((t) => {
@@ -283,8 +285,13 @@ export default function App() {
         if (payload.status === "completed") {
           setStep("completed");
           sse.close();
-        } else if (payload.status === "cancelled") {
+        } else if (payload.status === "cancelled" || payload.status === "failed") {
           sse.close();
+          if (playlist && playlist.tracks && playlist.tracks.length > 0) {
+            setStep("preview");
+          } else {
+            setStep("input");
+          }
         }
       } else if (payload.type === "track_update") {
         setTracksStatus((prev) => ({
@@ -300,20 +307,48 @@ export default function App() {
   };
 
   // 4. Cancel Job
-  const handleCancelJob = async () => {
-    if (!jobId) return;
-    try {
-      await fetch(`${API_BASE}/api/jobs/${jobId}`, { method: "DELETE" });
-      if (eventSourceRef.current) eventSourceRef.current.close();
-      setJobStatus("cancelled");
-    } catch (err) {
-      console.error("Cancel failed:", err);
+  const handleCancelJob = () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    if (jobId) {
+      fetch(`${API_BASE}/api/jobs/${jobId}`, { method: "DELETE" }).catch((err) => {
+        console.error("Cancel failed:", err);
+      });
+    }
+    setJobId(null);
+    setJobStatus(null);
+    setTracksStatus({});
+    if (playlist && playlist.tracks && playlist.tracks.length > 0) {
+      setStep("preview");
+    } else {
+      setStep("input");
+    }
+  };
+
+  // 4b. Return to track selection (after an aborted/failed job)
+  const returnToTracks = () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    setJobId(null);
+    setJobStatus(null);
+    setTracksStatus({});
+    if (playlist && playlist.tracks && playlist.tracks.length > 0) {
+      setStep("preview");
+    } else {
+      setStep("input");
     }
   };
 
   // 5. Reset App
   const handleReset = () => {
-    if (eventSourceRef.current) eventSourceRef.current.close();
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
     setStep("input");
     setUrl("");
     setPlaylist(null);
@@ -327,11 +362,14 @@ export default function App() {
   };
 
   // 5b. Go back to the previous step
-  const goBack = async () => {
+  const goBack = () => {
     if (step === "processing") {
-      await handleCancelJob();
-    } else if (eventSourceRef.current) {
+      handleCancelJob();
+      return;
+    }
+    if (eventSourceRef.current) {
       eventSourceRef.current.close();
+      eventSourceRef.current = null;
     }
     setError(null);
     if (step === "completed") {
@@ -509,7 +547,7 @@ export default function App() {
                 <Led label="PWR" active color="#00ff66" />
                 <Led label="LINK" active color="#00e5ff" />
                 <span className="text-[11px] text-zinc-600 uppercase tracking-wider">
-                  Max 50 tracks per rip · 192kbps encode
+                  Unlimited tracks per rip · 192kbps encode
                 </span>
               </div>
             </div>
@@ -525,7 +563,6 @@ export default function App() {
                   </span>
                   <span className="text-[12px] text-zinc-500 whitespace-nowrap">
                     {playlist.returned_tracks}/{playlist.total_tracks_in_playlist} ITEMS
-                    {playlist.truncated ? " (CAP 50)" : ""}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -628,11 +665,16 @@ export default function App() {
                 })}
               </div>
 
-              {jobStatus !== "cancelled" && (
+              <div className="flex items-center gap-3">
                 <RetroButton tone="danger" onClick={handleCancelJob}>
                   [ABORT OPERATION]
                 </RetroButton>
-              )}
+                {jobStatus === "cancelled" && (
+                  <RetroButton tone="primary" onClick={returnToTracks}>
+                    [RETURN TO TRACKS]
+                  </RetroButton>
+                )}
+              </div>
             </div>
           )}
 
